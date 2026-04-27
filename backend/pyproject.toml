@@ -1,0 +1,67 @@
+[tool.poetry]
+name = "conduit-backend"
+version = "0.1.0"
+description = "Conduit — MEP Intelligence. Connected. Backend API"
+authors = ["Bliss Systems LLC <dev@blissystems.com>"]
+license = "Proprietary"
+readme = "README.md"
+packages = [{include = "app"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.115.0"
+uvicorn = {extras = ["standard"], version = "^0.32.0"}
+gunicorn = "^22.0.0"
+pydantic = "^2.9.0"
+pydantic-settings = "^2.6.0"
+sqlalchemy = {extras = ["asyncio"], version = "^2.0.35"}
+asyncpg = "^0.30.0"
+alembic = "^1.14.0"
+celery = {extras = ["redis"], version = "^5.4.0"}
+redis = "^5.2.0"
+litellm = "^1.50.0"
+httpx = "^0.28.0"
+python-jose = {extras = ["cryptography"], version = "^3.3.0"}
+passlib = {extras = ["bcrypt"], version = "^1.7.4"}
+python-multipart = "^0.0.12"
+pillow = "^11.0.0"
+pymupdf = "^1.24.0"
+opencv-python-headless = "^4.10.0"
+pytesseract = "^0.3.13"
+numpy = "^2.1.0"
+pandas = "^2.2.0"
+reportlab = "^4.2.0"
+openpyxl = "^3.1.5"
+boto3 = "^1.35.0"
+sentry-sdk = {extras = ["fastapi"], version = "^2.18.0"}
+structlog = "^24.4.0"
+networkx = "^3.4.0"
+pgvector = "^0.3.5"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.0"
+pytest-asyncio = "^0.24.0"
+pytest-cov = "^6.0.0"
+httpx = "^0.28.0"
+ruff = "^0.8.0"
+mypy = "^1.13.0"
+bandit = "^1.8.0"
+pre-commit = "^4.0.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+select = ["E", "F", "W", "I", "N", "UP", "S", "B", "A", "C4", "DTZ", "ISC", "PIE", "PT", "RSE", "SIM", "TID"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+plugins = ["pydantic.mypy"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

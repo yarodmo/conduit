@@ -1,0 +1,59 @@
+# ══════════════════════════════════════
+# CONDUIT — Caddy Reverse Proxy
+# Prompt 0.2 — Ingress Layer
+# ══════════════════════════════════════
+
+{
+    # Global options
+    email admin@conduit.build
+}
+
+# Development configuration
+:80 {
+    # Frontend SPA
+    handle /app/* {
+        reverse_proxy frontend:80
+    }
+
+    handle / {
+        reverse_proxy frontend:80
+    }
+
+    # Backend API
+    handle /api/* {
+        reverse_proxy backend:8000
+    }
+
+    # AI Assistant (isolated container)
+    handle /assistant/* {
+        reverse_proxy assistant:8001
+    }
+
+    # Health endpoints
+    handle /health {
+        reverse_proxy backend:8000
+    }
+
+    # OpenAPI docs (dev only)
+    handle /docs {
+        reverse_proxy backend:8000
+    }
+
+    handle /redoc {
+        reverse_proxy backend:8000
+    }
+
+    handle /openapi.json {
+        reverse_proxy backend:8000
+    }
+
+    # Security headers (Prompt 0.1)
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        X-XSS-Protection "1; mode=block"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        -Server
+    }
+}

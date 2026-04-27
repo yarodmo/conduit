@@ -1,0 +1,283 @@
+# ══════════════════════════════════════════════════════════
+# CONDUIT — Docker Compose (Development)
+# Prompt 0.2 — Multi-Container Architecture
+# ══════════════════════════════════════════════════════════
+# Usage: docker compose -f infrastructure/compose/docker-compose.yml up -d
+
+version: "3.9"
+
+# ── Network Segmentation (Prompt 0.2) ──
+networks:
+  edge:
+    driver: bridge
+  app:
+    driver: bridge
+  data:
+    driver: bridge
+    internal: true
+  observability:
+    driver: bridge
+
+# ── Persistent Volumes ──
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  grafana_data:
+  prometheus_data:
+
+services:
+
+  # ════════════════════════════════════
+  # INGRESS LAYER
+  # ════════════════════════════════════
+
+  caddy:
+    image: caddy:2.8-alpine
+    container_name: conduit-caddy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ../../infrastructure/docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+    networks:
+      - edge
+    restart: unless-stopped
+
+  # ════════════════════════════════════
+  # APPLICATION LAYER
+  # ════════════════════════════════════
+
+  backend:
+    build:
+      context: ../../backend
+      dockerfile: ../infrastructure/docker/backend/Dockerfile
+    container_name: conduit-backend
+    env_file: ../../.env.local
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - edge
+      - app
+      - data
+      - observability
+    restart: unless-stopped
+
+  assistant:
+    build:
+      context: ../../backend
+      dockerfile: ../infrastructure/docker/assistant/Dockerfile
+    container_name: conduit-assistant
+    env_file: ../../.env.local
+    networks:
+      - edge
+      - app
+      - data
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ../../frontend-web
+      dockerfile: ../infrastructure/docker/frontend/Dockerfile
+    container_name: conduit-frontend
+    ports:
+      - "5173:80"
+    networks:
+      - edge
+      - observability
+    restart: unless-stopped
+
+  # ════════════════════════════════════
+  # WORKER LAYER (Celery)
+  # ════════════════════════════════════
+
+  worker-ai:
+    build:
+      context: ../../backend
+      dockerfile: ../infrastructure/docker/worker_ai/Dockerfile
+    container_name: conduit-worker-ai
+    env_file: ../../.env.local
+    depends_on:
+      - redis
+      - litellm
+    networks:
+      - app
+      - data
+      - observability
+    restart: unless-stopped
+
+  worker-plans:
+    build:
+      context: ../../backend
+      dockerfile: ../infrastructure/docker/worker_plans/Dockerfile
+    container_name: conduit-worker-plans
+    env_file: ../../.env.local
+    depends_on:
+      - redis
+      - minio
+    networks:
+      - app
+      - data
+      - observability
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+    restart: unless-stopped
+
+  worker-general:
+    build:
+      context: ../../backend
+      dockerfile: ../infrastructure/docker/worker_general/Dockerfile
+    container_name: conduit-worker-general
+    env_file: ../../.env.local
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - app
+      - data
+      - observability
+    restart: unless-stopped
+
+  # ════════════════════════════════════
+  # INTELLIGENCE LAYER
+  # ════════════════════════════════════
+
+  learning:
+    build:
+      context: ../../backend
+      dockerfile: ../infrastructure/docker/learning/Dockerfile
+    container_name: conduit-learning
+    env_file: ../../.env.local
+    profiles:
+      - intelligence
+    networks:
+      - app
+      - data
+    restart: "no"
+
+  analyzer:
+    build:
+      context: ../../backend
+      dockerfile: ../infrastructure/docker/analyzer/Dockerfile
+    container_name: conduit-analyzer
+    profiles:
+      - intelligence
+    networks:
+      - app
+      - observability
+    restart: "no"
+
+  # ════════════════════════════════════
+  # DATA LAYER (internal only)
+  # ════════════════════════════════════
+
+  postgres:
+    image: pgvector/pgvector:pg15
+    container_name: conduit-postgres
+    environment:
+      POSTGRES_DB: conduit
+      POSTGRES_USER: conduit
+      POSTGRES_PASSWORD: conduit_dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - data
+      - observability
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U conduit"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: conduit-redis
+    command: redis-server --requirepass conduit_dev_password
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - data
+      - observability
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "conduit_dev_password", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    container_name: conduit-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: conduit_dev
+      MINIO_ROOT_PASSWORD: conduit_dev_password
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - data
+    restart: unless-stopped
+
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: conduit-litellm
+    env_file: ../../.env.local
+    ports:
+      - "4000:4000"
+    networks:
+      - data
+    restart: unless-stopped
+
+  # ════════════════════════════════════
+  # OBSERVABILITY LAYER
+  # ════════════════════════════════════
+
+  prometheus:
+    image: prom/prometheus:v2.50.0
+    container_name: conduit-prometheus
+    volumes:
+      - ../../ops/monitoring/prometheus:/etc/prometheus:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - observability
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:10.3.0
+    container_name: conduit-grafana
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ../../ops/monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+    ports:
+      - "3001:3000"
+    networks:
+      - observability
+    restart: unless-stopped
+
+  loki:
+    image: grafana/loki:2.9.4
+    container_name: conduit-loki
+    volumes:
+      - ../../ops/monitoring/loki:/etc/loki:ro
+    ports:
+      - "3100:3100"
+    networks:
+      - observability
+    restart: unless-stopped

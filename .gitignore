@@ -1,0 +1,83 @@
+# ══════════════════════════════════════
+# CONDUIT — .gitignore (Mythos-Ready)
+# ══════════════════════════════════════
+
+# ── SECRETS (NEVER COMMIT) ──
+.env
+.env.local
+.env.staging
+.env.production
+*.pem
+*.key
+*.p12
+*_rsa
+*_ecdsa
+config/secrets/*.yaml
+config/secrets/*.json
+
+# ── Python / Backend ──
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.venv/
+venv/
+env/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+
+# ── Node / Frontend ──
+node_modules/
+frontend-web/dist/
+frontend-web/.vite/
+*.tsbuildinfo
+
+# ── Flutter / Mobile ──
+mobile/.dart_tool/
+mobile/.packages
+mobile/build/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/android/.gradle/
+mobile/android/app/build/
+mobile/android/local.properties
+mobile/ios/Pods/
+mobile/ios/.symlinks/
+mobile/ios/Flutter/Flutter.framework
+mobile/ios/Flutter/Flutter.podspec
+mobile/pubspec.lock
+
+# ── Docker ──
+docker-compose.override.yml
+
+# ── IDE ──
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# ── Logs ──
+*.log
+logs/
+
+# ── Generated (regenerated from OpenAPI) ──
+frontend-web/src/types/api.ts
+mobile/lib/core/api/generated/
+
+# ── Backups ──
+*.sql
+*.dump
+*.bak
