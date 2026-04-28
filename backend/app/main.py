@@ -1,61 +1,109 @@
 """
 Conduit Backend — FastAPI Application Entry Point
-ADR-000: Python 3.11+ / FastAPI pure end-to-end
-Bliss Systems LLC
+v11.0 Master Prompt: Sprint 1 — Auth, Projects & Plans Foundation
+
+Bliss Systems LLC — APEX Standard
 """
 
+import structlog
 from contextlib import asynccontextmanager
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
+from app.core.config import settings
+from app.core.database import engine, init_db
+from app.core.redis import close_redis, init_redis
+from app.middleware.error_handler import register_error_handlers
+from app.modules.auth.router import router as auth_router
+
+logger = structlog.get_logger()
+
+
+# ══════════════════════════════════════
+# LIFESPAN — Startup + Shutdown
+# ══════════════════════════════════════
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan — startup and shutdown events."""
+    """Manage application lifecycle — startup and graceful shutdown."""
     # ── Startup ──
-    # TODO: Initialize database connection pool
-    # TODO: Initialize Redis connection
-    # TODO: Verify S3/MinIO connectivity
-    # TODO: Load AI prompt templates
-    print("⚡ Conduit Backend starting...")
+    logger.info("conduit_starting", version="1.0.0", env=settings.APP_ENV)
+
+    await init_redis()
+    logger.info("redis_connected")
+
+    await init_db()
+    logger.info("database_ready")
+
+    logger.info("conduit_ready", docs_url="/api/docs")
+
     yield
+
     # ── Shutdown ──
-    # TODO: Close database connections
-    # TODO: Close Redis connections
-    print("🛑 Conduit Backend shutting down...")
+    logger.info("conduit_shutting_down")
+    await close_redis()
+    await engine.dispose()
+    logger.info("conduit_stopped")
 
 
-app = FastAPI(
-    title="Conduit API",
-    description="MEP Intelligence. Connected. — Bliss Systems LLC",
-    version="0.1.0",
-    docs_url="/docs" if True else None,  # Disable in production
-    redoc_url="/redoc",
-    lifespan=lifespan,
-)
+# ══════════════════════════════════════
+# APPLICATION FACTORY
+# ══════════════════════════════════════
 
-# ── CORS (Prompt 0.1 Security) ──
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # TODO: Load from env
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+def create_app() -> FastAPI:
+    """Create and configure the FastAPI application."""
+    app = FastAPI(
+        title="Conduit API",
+        description="MEP Intelligence. Connected. — Bliss Systems LLC",
+        version="1.0.0",
+        docs_url="/api/docs" if settings.APP_ENV != "production" else None,
+        redoc_url="/api/redoc" if settings.APP_ENV != "production" else None,
+        openapi_url="/api/openapi.json" if settings.APP_ENV != "production" else None,
+        lifespan=lifespan,
+    )
+
+    # ── Security Middleware ──
+    if settings.APP_ENV == "production":
+        app.add_middleware(
+            TrustedHostMiddleware,
+            allowed_hosts=["conduit.blissystems.com", "*.blissystems.com"],
+        )
+
+    # ── CORS ──
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.CORS_ORIGINS,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*", "X-Organization-ID"],
+        expose_headers=["X-Organization-ID"],
+    )
+
+    # ── Error Handlers ──
+    register_error_handlers(app)
+
+    # ── Routers ──
+    app.include_router(
+        auth_router,
+        prefix="/api/v1",
+        tags=["Auth & Organizations"],
+    )
+
+    # ── Health Check ──
+    @app.get("/health", tags=["System"])
+    async def health_check() -> dict:
+        """
+        Health check for Docker + load balancer.
+        Returns 200 when application is ready.
+        """
+        return {
+            "status": "healthy",
+            "version": "1.0.0",
+            "environment": settings.APP_ENV,
+        }
+
+    return app
 
 
-# ── Health Check ──
-@app.get("/health", tags=["System"])
-async def health_check():
-    """Health check endpoint for Docker healthcheck and load balancer."""
-    return {"status": "healthy", "service": "conduit-backend", "version": "0.1.0"}
-
-
-# ── API Router Registration ──
-# TODO (Sprint 1): Register module routers
-# from app.api.v1 import auth, projects, plans, takeoff
-# app.include_router(auth.router, prefix="/api/v1/auth", tags=["Auth"])
-# app.include_router(projects.router, prefix="/api/v1/projects", tags=["Projects"])
-# app.include_router(plans.router, prefix="/api/v1/plans", tags=["Plans"])
-# app.include_router(takeoff.router, prefix="/api/v1/takeoff", tags=["Takeoff"])
+app = create_app()

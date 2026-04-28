@@ -1,173 +1,166 @@
 """
-Conduit Backend — RBAC Permissions Matrix
-Prompt 0.1 — BOLA Mitigation (Capa 2)
+Conduit Backend — RBAC Permission Matrix
+Prompt 3: "RBAC Matrix" — maps role → permissions.
 
-Single source of truth for role-based access control.
-Every endpoint must check against this matrix.
+Roles:
+  SUPER_ADMIN → all permissions
+  ORG_ADMIN   → org management + all project ops
+  ORG_MEMBER  → read + own project ops
+  ENGINEER    → read + takeoff/BOM execution on assigned projects
+  VIEWER      → read only
+
+Granular permissions follow noun:verb pattern.
 """
 
 from enum import Enum
 
 
 class Role(str, Enum):
-    """Organization-level roles."""
-    OWNER = "OWNER"
-    ADMIN = "ADMIN"
-    PROJECT_MANAGER = "PROJECT_MANAGER"
+    SUPER_ADMIN = "SUPER_ADMIN"
+    ORG_ADMIN = "ORG_ADMIN"
+    ORG_MEMBER = "ORG_MEMBER"
     ENGINEER = "ENGINEER"
-    ESTIMATOR = "ESTIMATOR"
-    FIELD_TECH = "FIELD_TECH"
     VIEWER = "VIEWER"
-    PE_REVIEWER = "PE_REVIEWER"  # ADR-004: M15 Design Simulation
 
 
 class Permission(str, Enum):
-    """Granular permissions mapped to roles."""
-
-    # ── Auth & Org ──
-    ORG_MANAGE = "org:manage"
+    # ── Organization ──
+    ORG_READ = "org:read"
+    ORG_UPDATE = "org:update"
+    ORG_DELETE = "org:delete"
     ORG_INVITE = "org:invite"
-    ORG_BILLING = "org:billing"
+    ORG_MANAGE_MEMBERS = "org:manage_members"
+    ORG_MANAGE_BILLING = "org:manage_billing"
 
     # ── Projects ──
     PROJECT_CREATE = "project:create"
-    PROJECT_EDIT = "project:edit"
+    PROJECT_READ = "project:read"
+    PROJECT_UPDATE = "project:update"
     PROJECT_DELETE = "project:delete"
-    PROJECT_VIEW = "project:view"
+    PROJECT_MANAGE_MEMBERS = "project:manage_members"
 
-    # ── Plans (M3) ──
+    # ── Takeoffs ──
+    TAKEOFF_CREATE = "takeoff:create"
+    TAKEOFF_READ = "takeoff:read"
+    TAKEOFF_UPDATE = "takeoff:update"
+    TAKEOFF_DELETE = "takeoff:delete"
+    TAKEOFF_RUN = "takeoff:run"          # Execute AI extraction
+    TAKEOFF_APPROVE = "takeoff:approve"  # Approve takeoff for BOM
+
+    # ── BOM ──
+    BOM_CREATE = "bom:create"
+    BOM_READ = "bom:read"
+    BOM_UPDATE = "bom:update"
+    BOM_DELETE = "bom:delete"
+    BOM_EXPORT = "bom:export"
+
+    # ── Plans (MEP drawings) ──
     PLAN_UPLOAD = "plan:upload"
-    PLAN_VIEW = "plan:view"
+    PLAN_READ = "plan:read"
     PLAN_DELETE = "plan:delete"
 
-    # ── Takeoff (M5 — THE WEDGE) ──
-    TAKEOFF_RUN = "takeoff:run"
-    TAKEOFF_APPROVE = "takeoff:approve"
-    TAKEOFF_EXPORT = "takeoff:export"
-    TAKEOFF_VIEW = "takeoff:view"
+    # ── AI Features ──
+    AI_ANALYZE = "ai:analyze"
+    AI_CHAT = "ai:chat"
 
-    # ── Field (M6) ──
-    FIELD_UPDATE_PROGRESS = "field:update_progress"
-    FIELD_SUBMIT_PHOTO = "field:submit_photo"
-    FIELD_VIEW_ZONES = "field:view_zones"
-    FIELD_ASSIGN_ZONES = "field:assign_zones"
+    # ── Reports ──
+    REPORT_READ = "report:read"
+    REPORT_EXPORT = "report:export"
 
-    # ── RFI (M7) ──
-    RFI_CREATE = "rfi:create"
-    RFI_RESPOND = "rfi:respond"
-    RFI_APPROVE = "rfi:approve"
-    RFI_VIEW = "rfi:view"
-
-    # ── Reports (M9) ──
-    REPORT_GENERATE = "report:generate"
-    REPORT_VIEW = "report:view"
-
-    # ── AI Assistant (M10) ──
-    ASSISTANT_QUERY = "assistant:query"
-
-    # ── Design Simulation (M15 — ADR-004) ──
-    SIMULATION_CREATE = "simulation:create"
-    SIMULATION_VIEW = "simulation:view"
-    SIMULATION_EXPORT = "simulation:export"
-
-    # ── PE Review (M15) ──
-    PE_REVIEW_QUEUE = "pe:review_queue"
-    PE_REVIEW_SIMULATION = "pe:review_simulation"
-    PE_APPROVE_SIMULATION = "pe:approve_simulation"
-    PE_REJECT_SIMULATION = "pe:reject_simulation"
-    PE_CORRECT_SIMULATION = "pe:correct_simulation"
-    PE_VIEW_METRICS = "pe:view_metrics"
+    # ── Admin ──
+    ADMIN_PANEL = "admin:panel"
+    ADMIN_IMPERSONATE = "admin:impersonate"
 
 
 # ══════════════════════════════════════
-# PERMISSION MATRIX — IMMUTABLE
+# PERMISSION MATRIX — Source of truth
+# Prompt 3: "Tabla de Permisos por Rol"
 # ══════════════════════════════════════
-# Roles → Set of permissions
+
 ROLE_PERMISSIONS: dict[Role, set[Permission]] = {
-    Role.OWNER: set(Permission),  # All permissions
+    Role.SUPER_ADMIN: set(Permission),  # All permissions
 
-    Role.ADMIN: {
-        Permission.ORG_MANAGE, Permission.ORG_INVITE,
-        Permission.PROJECT_CREATE, Permission.PROJECT_EDIT,
-        Permission.PROJECT_DELETE, Permission.PROJECT_VIEW,
-        Permission.PLAN_UPLOAD, Permission.PLAN_VIEW, Permission.PLAN_DELETE,
-        Permission.TAKEOFF_RUN, Permission.TAKEOFF_APPROVE,
-        Permission.TAKEOFF_EXPORT, Permission.TAKEOFF_VIEW,
-        Permission.FIELD_VIEW_ZONES, Permission.FIELD_ASSIGN_ZONES,
-        Permission.RFI_CREATE, Permission.RFI_RESPOND,
-        Permission.RFI_APPROVE, Permission.RFI_VIEW,
-        Permission.REPORT_GENERATE, Permission.REPORT_VIEW,
-        Permission.ASSISTANT_QUERY,
-        Permission.SIMULATION_CREATE, Permission.SIMULATION_VIEW,
-        Permission.SIMULATION_EXPORT,
+    Role.ORG_ADMIN: {
+        Permission.ORG_READ,
+        Permission.ORG_UPDATE,
+        Permission.ORG_INVITE,
+        Permission.ORG_MANAGE_MEMBERS,
+        Permission.ORG_MANAGE_BILLING,
+        Permission.PROJECT_CREATE,
+        Permission.PROJECT_READ,
+        Permission.PROJECT_UPDATE,
+        Permission.PROJECT_DELETE,
+        Permission.PROJECT_MANAGE_MEMBERS,
+        Permission.TAKEOFF_CREATE,
+        Permission.TAKEOFF_READ,
+        Permission.TAKEOFF_UPDATE,
+        Permission.TAKEOFF_DELETE,
+        Permission.TAKEOFF_RUN,
+        Permission.TAKEOFF_APPROVE,
+        Permission.BOM_CREATE,
+        Permission.BOM_READ,
+        Permission.BOM_UPDATE,
+        Permission.BOM_DELETE,
+        Permission.BOM_EXPORT,
+        Permission.PLAN_UPLOAD,
+        Permission.PLAN_READ,
+        Permission.PLAN_DELETE,
+        Permission.AI_ANALYZE,
+        Permission.AI_CHAT,
+        Permission.REPORT_READ,
+        Permission.REPORT_EXPORT,
     },
 
-    Role.PROJECT_MANAGER: {
-        Permission.PROJECT_CREATE, Permission.PROJECT_EDIT, Permission.PROJECT_VIEW,
-        Permission.PLAN_UPLOAD, Permission.PLAN_VIEW,
-        Permission.TAKEOFF_RUN, Permission.TAKEOFF_APPROVE,
-        Permission.TAKEOFF_EXPORT, Permission.TAKEOFF_VIEW,
-        Permission.FIELD_VIEW_ZONES, Permission.FIELD_ASSIGN_ZONES,
-        Permission.RFI_CREATE, Permission.RFI_RESPOND,
-        Permission.RFI_APPROVE, Permission.RFI_VIEW,
-        Permission.REPORT_GENERATE, Permission.REPORT_VIEW,
-        Permission.ASSISTANT_QUERY,
-        Permission.SIMULATION_CREATE, Permission.SIMULATION_VIEW,
-        Permission.SIMULATION_EXPORT,
+    Role.ORG_MEMBER: {
+        Permission.ORG_READ,
+        Permission.PROJECT_CREATE,
+        Permission.PROJECT_READ,
+        Permission.PROJECT_UPDATE,
+        Permission.TAKEOFF_CREATE,
+        Permission.TAKEOFF_READ,
+        Permission.TAKEOFF_UPDATE,
+        Permission.TAKEOFF_RUN,
+        Permission.BOM_CREATE,
+        Permission.BOM_READ,
+        Permission.BOM_EXPORT,
+        Permission.PLAN_UPLOAD,
+        Permission.PLAN_READ,
+        Permission.AI_ANALYZE,
+        Permission.AI_CHAT,
+        Permission.REPORT_READ,
+        Permission.REPORT_EXPORT,
     },
 
     Role.ENGINEER: {
-        Permission.PROJECT_VIEW,
-        Permission.PLAN_UPLOAD, Permission.PLAN_VIEW,
-        Permission.TAKEOFF_RUN, Permission.TAKEOFF_VIEW,
-        Permission.TAKEOFF_EXPORT,
-        Permission.FIELD_VIEW_ZONES,
-        Permission.RFI_CREATE, Permission.RFI_RESPOND, Permission.RFI_VIEW,
-        Permission.REPORT_VIEW,
-        Permission.ASSISTANT_QUERY,
-        Permission.SIMULATION_CREATE, Permission.SIMULATION_VIEW,
-    },
-
-    Role.ESTIMATOR: {
-        Permission.PROJECT_VIEW,
-        Permission.PLAN_VIEW,
-        Permission.TAKEOFF_RUN, Permission.TAKEOFF_VIEW,
-        Permission.TAKEOFF_EXPORT, Permission.TAKEOFF_APPROVE,
-        Permission.REPORT_GENERATE, Permission.REPORT_VIEW,
-        Permission.ASSISTANT_QUERY,
-    },
-
-    Role.FIELD_TECH: {
-        Permission.PROJECT_VIEW,
-        Permission.PLAN_VIEW,
-        Permission.TAKEOFF_VIEW,
-        Permission.FIELD_UPDATE_PROGRESS, Permission.FIELD_SUBMIT_PHOTO,
-        Permission.FIELD_VIEW_ZONES,
-        Permission.RFI_CREATE, Permission.RFI_VIEW,
-        Permission.ASSISTANT_QUERY,
+        Permission.ORG_READ,
+        Permission.PROJECT_READ,
+        Permission.TAKEOFF_READ,
+        Permission.TAKEOFF_RUN,
+        Permission.BOM_READ,
+        Permission.BOM_EXPORT,
+        Permission.PLAN_READ,
+        Permission.AI_ANALYZE,
+        Permission.AI_CHAT,
+        Permission.REPORT_READ,
     },
 
     Role.VIEWER: {
-        Permission.PROJECT_VIEW,
-        Permission.PLAN_VIEW,
-        Permission.TAKEOFF_VIEW,
-        Permission.FIELD_VIEW_ZONES,
-        Permission.RFI_VIEW,
-        Permission.REPORT_VIEW,
-    },
-
-    Role.PE_REVIEWER: {
-        Permission.PE_REVIEW_QUEUE,
-        Permission.PE_REVIEW_SIMULATION,
-        Permission.PE_APPROVE_SIMULATION,
-        Permission.PE_REJECT_SIMULATION,
-        Permission.PE_CORRECT_SIMULATION,
-        Permission.PE_VIEW_METRICS,
-        Permission.SIMULATION_VIEW,
+        Permission.ORG_READ,
+        Permission.PROJECT_READ,
+        Permission.TAKEOFF_READ,
+        Permission.BOM_READ,
+        Permission.PLAN_READ,
+        Permission.REPORT_READ,
     },
 }
 
 
 def has_permission(role: Role, permission: Permission) -> bool:
     """Check if a role has a specific permission."""
-    return permission in ROLE_PERMISSIONS.get(role, set())
+    perms = ROLE_PERMISSIONS.get(role, set())
+    return permission in perms
+
+
+def get_permissions(role: Role) -> set[Permission]:
+    """Get all permissions for a role."""
+    return ROLE_PERMISSIONS.get(role, set())
