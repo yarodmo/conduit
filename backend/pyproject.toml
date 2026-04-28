@@ -47,6 +47,8 @@ ruff = "^0.8.0"
 mypy = "^1.13.0"
 bandit = "^1.8.0"
 pre-commit = "^4.0.0"
+fakeredis = "^2.26.0"
+aiosqlite = "^0.20.0"
 
 [build-system]
 requires = ["poetry-core"]
@@ -56,6 +58,7 @@ build-backend = "poetry.core.masonry.api"
 target-version = "py311"
 line-length = 100
 select = ["E", "F", "W", "I", "N", "UP", "S", "B", "A", "C4", "DTZ", "ISC", "PIE", "PT", "RSE", "SIM", "TID"]
+ignore = ["S101", "S105", "S106"]  # Allow assert in tests, hardcoded test passwords
 
 [tool.mypy]
 python_version = "3.11"
@@ -65,3 +68,8 @@ plugins = ["pydantic.mypy"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+addopts = "--cov=app --cov-report=term-missing --cov-report=html --cov-fail-under=80"
+
+[tool.coverage.run]
+source = ["app"]
+omit = ["app/main.py", "*/migrations/*"]
