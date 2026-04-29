@@ -6,6 +6,7 @@ Re-export all models for Alembic discovery.
 from app.models.auth import (
     AuditLog,
     Invitation,
+    PasswordResetToken,
     Organization,
     OrganizationMember,
     SubscriptionPlan,
@@ -23,6 +24,7 @@ __all__ = [
     "OrganizationMember",
     "UserSession",
     "Invitation",
+    "PasswordResetToken",
     "SubscriptionPlan",
     "AuditLog",
     "Project",

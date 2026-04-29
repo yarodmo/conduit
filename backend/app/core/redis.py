@@ -1,13 +1,16 @@
 """
 Conduit Backend — Redis Client
 Prompt 3 Security:
-  - Rate limiting: 5 attempts/15min per IP
+  - Rate limiting: 5 attempts/15min per IP (TRUE sliding window via ZSET)
   - Account lockout: 10 attempts → lock 1 hour
   - JWT blacklist: revoked tokens with TTL
   - Blacklist: Redis with TTL = remaining token lifespan
 
-LAW: All rate limiting uses sliding window algorithm.
+LAW: Sliding window uses Redis ZSET with microsecond timestamps.
+      Fixed-window counters allow window-boundary bypass attacks.
 """
+
+import time
 
 from redis.asyncio import Redis
 
@@ -41,7 +44,16 @@ async def check_rate_limit(
     window_seconds: int = settings.LOGIN_RATE_LIMIT_WINDOW,
 ) -> tuple[bool, int]:
     """
-    Sliding window rate limiter.
+    TRUE sliding window rate limiter using Redis ZSET.
+
+    Strategy:
+    1. Each attempt = ZSET member with float timestamp score.
+    2. Remove entries older than window (always fresh slice).
+    3. Count remaining → reject if >= max_attempts.
+
+    Eliminates the window-boundary bypass present in fixed-window counters,
+    where an attacker can hit N attempts at second 0, wait for reset, then
+    N more at second 0 of next window — effectively 2N per window.
 
     Args:
         key: Unique identifier (e.g., f"login:{ip_address}")
@@ -52,26 +64,41 @@ async def check_rate_limit(
         tuple: (is_allowed, remaining_attempts)
     """
     redis_key = f"ratelimit:{key}"
-    current = await redis_client.get(redis_key)
+    now = time.time()
+    window_start = now - window_seconds
 
-    if current is None:
-        await redis_client.setex(redis_key, window_seconds, 1)
-        return True, max_attempts - 1
+    # Atomic pipeline: remove stale, count, conditionally add
+    async with redis_client.pipeline(transaction=True) as pipe:
+        pipe.zremrangebyscore(redis_key, 0, window_start)  # evict stale
+        pipe.zcard(redis_key)                              # count after eviction
+        pipe.expire(redis_key, window_seconds + 1)        # TTL safety net
+        results = await pipe.execute()
 
-    count = int(current)
-    if count >= max_attempts:
-        ttl = await redis_client.ttl(redis_key)
+    current_count: int = results[1]
+
+    if current_count >= max_attempts:
         return False, 0
 
-    await redis_client.incr(redis_key)
-    return True, max_attempts - count - 1
+    # Add current attempt
+    member_key = f"{now:.6f}"  # microsecond precision avoids member collision
+    await redis_client.zadd(redis_key, {member_key: now})
+    return True, max_attempts - current_count - 1
 
 
 async def get_rate_limit_ttl(key: str) -> int:
-    """Get remaining seconds until rate limit resets."""
+    """
+    Get remaining seconds until rate limit window resets.
+    With ZSET sliding window, returns time until oldest entry expires.
+    """
     redis_key = f"ratelimit:{key}"
-    ttl = await redis_client.ttl(redis_key)
-    return max(ttl, 0)
+    # Get the oldest entry score (earliest timestamp in window)
+    oldest = await redis_client.zrange(redis_key, 0, 0, withscores=True)
+    if not oldest:
+        return 0
+    oldest_ts: float = oldest[0][1]
+    window_seconds = settings.LOGIN_RATE_LIMIT_WINDOW
+    remaining = int(oldest_ts + window_seconds - time.time())
+    return max(remaining, 0)
 
 
 # ══════════════════════════════════════

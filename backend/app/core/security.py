@@ -41,24 +41,42 @@ def verify_password(plain: str, hashed: str) -> bool:
 # ── JWT RS256 Token Management ──
 
 def _get_private_key() -> str:
-    """Get RSA private key for signing. Falls back to HS256 in dev."""
+    """
+    Get RSA private key for signing.
+    LAW: In production, missing key = hard failure. No silent downgrade.
+    """
     key = settings.jwt_private_key
     if not key:
-        # Dev fallback: use APP_SECRET_KEY with HS256
+        if settings.is_production:
+            msg = (
+                "FATAL: JWT_PRIVATE_KEY_PATH not configured or file missing. "
+                "Cannot start in production without RSA key."
+            )
+            raise RuntimeError(msg)
+        # Dev-only fallback: HS256 with APP_SECRET_KEY
         return settings.APP_SECRET_KEY
     return key
 
 
 def _get_public_key() -> str:
-    """Get RSA public key for verification. Falls back to HS256 in dev."""
+    """
+    Get RSA public key for verification.
+    LAW: In production, missing key = hard failure.
+    """
     key = settings.jwt_public_key
     if not key:
+        if settings.is_production:
+            msg = (
+                "FATAL: JWT_PUBLIC_KEY_PATH not configured or file missing. "
+                "Cannot verify tokens in production without RSA key."
+            )
+            raise RuntimeError(msg)
         return settings.APP_SECRET_KEY
     return key
 
 
 def _get_algorithm() -> str:
-    """RS256 in production, HS256 fallback in dev without keys."""
+    """RS256 when RSA key present, HS256 dev-only fallback."""
     if settings.jwt_private_key:
         return "RS256"
     return "HS256"

@@ -26,6 +26,7 @@ from app.core.redis import (
     get_rate_limit_ttl,
     increment_login_failure,
     is_account_locked,
+    is_refresh_token_blacklisted,
 )
 from app.core.security import (
     create_access_token,
@@ -50,6 +51,7 @@ from app.modules.auth.repository import (
     AuthRepository,
     InvitationRepository,
     OrganizationRepository,
+    PasswordResetRepository,
     SessionRepository,
 )
 from app.modules.auth.schemas import (
@@ -74,6 +76,7 @@ class AuthService:
         self.org_repo = OrganizationRepository(db)
         self.session_repo = SessionRepository(db)
         self.invitation_repo = InvitationRepository(db)
+        self.password_reset_repo = PasswordResetRepository(db)
         self.audit_repo = AuditRepository(db)
 
     # ══════════════════════════════════════
@@ -254,6 +257,12 @@ class AuthService:
         Validate old token → issue new pair → revoke old.
         """
         token_hash = hash_refresh_token(raw_refresh_token)
+
+        # GAP-003 FIX: Check Redis blacklist BEFORE DB lookup.
+        # Prevents replay of rotated tokens even in race conditions.
+        if await is_refresh_token_blacklisted(token_hash):
+            raise AuthenticationError("Refresh token has been revoked", "TOKEN_REVOKED")
+
         session = await self.session_repo.get_by_token_hash(token_hash)
 
         if not session:
@@ -316,24 +325,24 @@ class AuthService:
     # FORGOT PASSWORD — OTP via Celery
     # ══════════════════════════════════════
 
-    async def forgot_password(self, email: str) -> MessageResponse:
+    async def forgot_password(self, email: str, ip_address: str | None = None) -> MessageResponse:
         """
         Prompt 3: "POST /auth/forgot-password → email con link OTP (Celery async)"
+        GAP-001 FIX: Uses PasswordResetToken table — not Invitation.
         Always returns success to prevent email enumeration.
         """
         user = await self.auth_repo.get_by_email(email)
 
         if user:
             token = generate_password_reset_token()
-            # Store reset token as an invitation-type record (reuse mechanism)
             expires = datetime.now(timezone.utc) + timedelta(hours=1)
-            await self.invitation_repo.create(
+            # GAP-001 FIX: Dedicated PasswordResetToken — no org_id UUID hack
+            await self.password_reset_repo.create(
                 email=email,
                 token=token,
-                org_id=uuid.UUID(int=0),  # Placeholder for password reset
-                role=OrgRole.ORG_MEMBER,
-                invited_by=user.id,
+                user_id=user.id,
                 expires_at=expires,
+                ip_address=ip_address,
             )
 
             # Dispatch email via Celery
@@ -358,12 +367,18 @@ class AuthService:
         new_password: str,
         ip_address: str | None = None,
     ) -> MessageResponse:
-        """Prompt 3: "POST /auth/reset-password → cambiar password con token"."""
-        invitation = await self.invitation_repo.get_by_token(token)
-        if not invitation:
+        """
+        Prompt 3: "POST /auth/reset-password → cambiar password con token"
+        GAP-001 FIX: Uses PasswordResetToken table — not Invitation.
+        """
+        reset_record = await self.password_reset_repo.get_by_token(token)
+        if not reset_record or reset_record.used_at is not None:
             raise AuthenticationError("Invalid or expired reset token", "INVALID_RESET_TOKEN")
 
-        user = await self.auth_repo.get_by_email(invitation.email)
+        if reset_record.expires_at < datetime.now(timezone.utc):
+            raise AuthenticationError("Reset token has expired", "TOKEN_EXPIRED")
+
+        user = await self.auth_repo.get_by_email(reset_record.email)
         if not user:
             raise NotFoundError("User")
 
@@ -371,10 +386,10 @@ class AuthService:
         hashed = hash_password(new_password)
         await self.auth_repo.update_password(user.id, hashed)
 
-        # Mark token as used
-        await self.invitation_repo.mark_accepted(invitation.id)
+        # Mark token as used (idempotent — prevents double-use)
+        await self.password_reset_repo.mark_used(reset_record.id)
 
-        # Revoke all existing sessions
+        # Revoke all existing sessions (force re-login after password change)
         await self.session_repo.revoke_all_user_sessions(user.id)
 
         # Audit
@@ -394,19 +409,17 @@ class AuthService:
 
     async def get_me(self, user: User) -> UserResponse:
         """Prompt 3: "GET /auth/me → perfil + orgs + roles"."""
-        memberships = await self.org_repo.get_user_orgs(user.id)
+        # GAP-006 FIX: Single JOIN query — was N+1 per org membership
+        memberships_with_orgs = await self.org_repo.get_user_orgs_with_orgs(user.id)
 
-        org_responses = []
-        for m in memberships:
-            org = await self.org_repo.get_by_id(m.org_id)
-            if org:
-                org_responses.append(
-                    OrgMembershipResponse(
-                        org_id=org.id,
-                        org_name=org.name,
-                        role=m.role.value,
-                    )
-                )
+        org_responses = [
+            OrgMembershipResponse(
+                org_id=org.id,
+                org_name=org.name,
+                role=m.role.value,
+            )
+            for m, org in memberships_with_orgs
+        ]
 
         return UserResponse(
             id=user.id,
@@ -470,21 +483,19 @@ class AuthService:
         if not org:
             raise NotFoundError("Organization")
 
-        members = await self.org_repo.get_members(org_id)
-        member_responses = []
-        for m in members:
-            member_user = await self.auth_repo.get_by_id(m.user_id)
-            if member_user:
-                member_responses.append(
-                    MemberResponse(
-                        id=m.id,
-                        user_id=m.user_id,
-                        email=member_user.email,
-                        full_name=member_user.full_name,
-                        role=m.role.value,
-                        joined_at=m.created_at,
-                    )
-                )
+        # GAP-007 FIX: Single JOIN query — was N+1 per member
+        members_with_users = await self.org_repo.get_members_with_users(org_id)
+        member_responses = [
+            MemberResponse(
+                id=m.id,
+                user_id=m.user_id,
+                email=u.email,
+                full_name=u.full_name,
+                role=m.role.value,
+                joined_at=m.created_at,
+            )
+            for m, u in members_with_users
+        ]
 
         plan_name = org.plan.display_name if org.plan else None
 
@@ -634,22 +645,19 @@ class AuthService:
 
     async def get_members(self, org_id: uuid.UUID) -> list[MemberResponse]:
         """List all org members with their roles."""
-        members = await self.org_repo.get_members(org_id)
-        responses = []
-        for m in members:
-            user = await self.auth_repo.get_by_id(m.user_id)
-            if user:
-                responses.append(
-                    MemberResponse(
-                        id=m.id,
-                        user_id=m.user_id,
-                        email=user.email,
-                        full_name=user.full_name,
-                        role=m.role.value,
-                        joined_at=m.created_at,
-                    )
-                )
-        return responses
+        # GAP-008 FIX: Single JOIN query — was N+1 per member
+        members_with_users = await self.org_repo.get_members_with_users(org_id)
+        return [
+            MemberResponse(
+                id=m.id,
+                user_id=m.user_id,
+                email=u.email,
+                full_name=u.full_name,
+                role=m.role.value,
+                joined_at=m.created_at,
+            )
+            for m, u in members_with_users
+        ]
 
     async def update_member_role(
         self,

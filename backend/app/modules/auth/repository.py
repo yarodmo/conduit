@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy import and_, delete, func, select, update
+from sqlalchemy.orm import joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.auth import (
@@ -20,6 +21,7 @@ from app.models.auth import (
     Organization,
     OrganizationMember,
     OrgRole,
+    PasswordResetToken,
     SubscriptionPlan,
     User,
     UserSession,
@@ -249,6 +251,44 @@ class OrganizationRepository:
         )
         return list(result.scalars().all())
 
+    async def get_user_orgs_with_orgs(
+        self, user_id: uuid.UUID,
+    ) -> list[tuple]:
+        """
+        GAP-006 FIX: Single JOIN query — replaces N+1 in get_me().
+        Returns list of (OrganizationMember, Organization) tuples.
+        """
+        result = await self.db.execute(
+            select(OrganizationMember, Organization)
+            .join(Organization, OrganizationMember.org_id == Organization.id)
+            .where(
+                OrganizationMember.user_id == user_id,
+                OrganizationMember.deleted_at.is_(None),
+                Organization.deleted_at.is_(None),
+            )
+            .order_by(OrganizationMember.created_at)
+        )
+        return list(result.all())
+
+    async def get_members_with_users(
+        self, org_id: uuid.UUID,
+    ) -> list[tuple]:
+        """
+        GAP-007/008 FIX: Single JOIN query — replaces N+1 in get_my_organization() and get_members().
+        Returns list of (OrganizationMember, User) tuples.
+        """
+        result = await self.db.execute(
+            select(OrganizationMember, User)
+            .join(User, OrganizationMember.user_id == User.id)
+            .where(
+                OrganizationMember.org_id == org_id,
+                OrganizationMember.deleted_at.is_(None),
+                User.deleted_at.is_(None),
+            )
+            .order_by(OrganizationMember.created_at)
+        )
+        return list(result.all())
+
     async def get_default_plan(self) -> SubscriptionPlan | None:
         """Get the free plan for new organizations."""
         result = await self.db.execute(
@@ -413,3 +453,60 @@ class AuditRepository:
         self.db.add(entry)
         await self.db.flush()
         return entry
+
+
+# ══════════════════════════════════════
+# PASSWORD RESET REPOSITORY — GAP-001
+# ══════════════════════════════════════
+
+class PasswordResetRepository:
+    """
+    Handles PasswordResetToken CRUD.
+    GAP-001 Fix: Replaces uuid-zero hack in InvitationRepository.
+    """
+
+    def __init__(self, db: AsyncSession):
+        self.db = db
+
+    async def create(
+        self,
+        email: str,
+        token: str,
+        user_id: uuid.UUID,
+        expires_at: datetime,
+        ip_address: str | None = None,
+    ) -> PasswordResetToken:
+        """Create a new password reset token record."""
+        record = PasswordResetToken(
+            email=email,
+            token=token,
+            user_id=user_id,
+            expires_at=expires_at,
+            ip_address=ip_address,
+        )
+        self.db.add(record)
+        await self.db.flush()
+        return record
+
+    async def get_by_token(self, token: str) -> PasswordResetToken | None:
+        """Fetch a reset token record by its raw token value."""
+        from sqlalchemy import select
+        stmt = (
+            select(PasswordResetToken)
+            .where(PasswordResetToken.token == token)
+            .where(PasswordResetToken.deleted_at.is_(None))
+        )
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def mark_used(self, record_id: uuid.UUID) -> None:
+        """Mark token as consumed — prevents double-use."""
+        from sqlalchemy import update
+        from datetime import datetime, timezone
+        stmt = (
+            update(PasswordResetToken)
+            .where(PasswordResetToken.id == record_id)
+            .values(used_at=datetime.now(timezone.utc))
+        )
+        await self.db.execute(stmt)
+        await self.db.flush()

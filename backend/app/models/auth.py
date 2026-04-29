@@ -282,6 +282,49 @@ class Invitation(ConduitBase):
 
 
 # ══════════════════════════════════════
+# PASSWORD RESET TOKEN — GAP-001 FIX
+# Dedicated table, no UUID-zero hack
+# ══════════════════════════════════════
+
+class PasswordResetToken(ConduitBase):
+    """
+    Dedicated password reset token — separate from Invitation.
+
+    GAP-001 Fix: Previously, forgot_password() reused invitations table
+    with org_id=UUID(int=0), violating FK constraint in production.
+    This table has no org_id FK — resets are user-scoped, not org-scoped.
+    """
+    __tablename__ = "password_reset_tokens"
+
+    email: Mapped[str] = mapped_column(
+        String(255), nullable=False, index=True,
+    )
+    token: Mapped[str] = mapped_column(
+        String(512), unique=True, nullable=False, index=True,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False,
+    )
+    used_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
+    ip_address: Mapped[str | None] = mapped_column(
+        String(45), nullable=True,
+    )
+
+    __table_args__ = (
+        Index("ix_password_reset_token_tok", "token"),
+        Index("ix_password_reset_token_user", "user_id"),
+    )
+
+
+# ══════════════════════════════════════
 # SUBSCRIPTION PLAN — Tier limits
 # ══════════════════════════════════════
 
