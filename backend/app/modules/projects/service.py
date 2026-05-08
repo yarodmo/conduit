@@ -190,9 +190,11 @@ class ProjectService:
             for m, u in member_rows
         ]
 
-        response = ProjectDetailResponse.model_validate(project)
-        response.members = members
-        return response
+        base_project = ProjectResponse.model_validate(project)
+        return ProjectDetailResponse(
+            **base_project.model_dump(),
+            members=members
+        )
 
     async def update_project(
         self,
