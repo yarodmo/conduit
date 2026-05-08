@@ -48,12 +48,13 @@ jobs:
           python-version: "3.12"
 
       - name: Install Poetry
-        run: pip install poetry==1.8.3
+        run: |
+          pip install poetry==1.8.3
+          poetry config virtualenvs.in-project true
 
       - name: Install dependencies
         working-directory: backend
-        run: |
-          poetry install --with dev --no-root
+        run: poetry install --with dev
 
       - name: Run tests
         working-directory: backend
@@ -72,7 +73,7 @@ jobs:
           FRONTEND_URL: http://localhost:3000
           ALLOWED_ORIGINS: http://localhost:3000
         run: |
-          pytest tests/ -v \
+          poetry run pytest tests/ -v \
             --tb=short \
             --cov=app \
             --cov-report=term-missing \
