@@ -24,7 +24,7 @@ TEMPLATE_DIR = Path(__file__).parent.parent / "templates" / "emails"
 
 def _send_email(to: str, subject: str, html_body: str) -> None:
     """Send email via SMTP. Used by all email tasks."""
-    if not settings.SMTP_HOST or settings.APP_ENV == "development":
+    if not settings.SMTP_HOST or settings.ENVIRONMENT == "development":
         logger.info(
             "email_skipped_dev_mode",
             to=to,
@@ -33,7 +33,7 @@ def _send_email(to: str, subject: str, html_body: str) -> None:
         return
 
     msg = MIMEMultipart("alternative")
-    msg["From"] = f"{settings.SMTP_FROM_NAME} <{settings.SMTP_FROM_EMAIL}>"
+    msg["From"] = f"{settings.SMTP_FROM_NAME} <{settings.SMTP_FROM}>"
     msg["To"] = to
     msg["Subject"] = subject
     msg.attach(MIMEText(html_body, "html"))

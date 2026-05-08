@@ -98,15 +98,27 @@ class TestRSAProductionHardFailure:
 class TestJWTAlgorithmEnforcement:
 
     def test_access_token_uses_rs256(self):
-        """Access token must declare RS256 in header."""
+        """Access token must declare RS256 in header when RSA keys are configured."""
+        import base64
         import jwt as pyjwt
         from app.core.security import create_access_token
         import uuid
 
-        token = create_access_token(
-            user_id=uuid.uuid4(),
-            email="test@conduit.build",
-        )
+        priv_pem, pub_pem = generate_rsa_keypair()
+        priv_b64 = base64.b64encode(priv_pem).decode()
+        pub_b64 = base64.b64encode(pub_pem).decode()
+
+        with patch.multiple(
+            "app.core.security.settings",
+            JWT_PRIVATE_KEY=priv_b64,
+            JWT_PUBLIC_KEY=pub_b64,
+            JWT_PRIVATE_KEY_PATH="nonexistent.pem",
+            JWT_PUBLIC_KEY_PATH="nonexistent.pem",
+            ENVIRONMENT="test",
+            JWT_ACCESS_TOKEN_EXPIRE_MINUTES=15,
+        ):
+            token = create_access_token(user_id=uuid.uuid4())
+
         header = pyjwt.get_unverified_header(token)
         assert header["alg"] == "RS256", (
             f"Expected RS256 but got {header['alg']} — HS256 downgrade detected!"
@@ -115,7 +127,7 @@ class TestJWTAlgorithmEnforcement:
     def test_token_verify_rejects_hs256_tokens(self):
         """A token signed with HS256 (attacker forgery) must be rejected."""
         import jwt as pyjwt
-        from app.core.security import verify_token
+        from app.core.security import verify_access_token
 
         # Craft a fake HS256 token
         fake_payload = {
@@ -126,7 +138,7 @@ class TestJWTAlgorithmEnforcement:
         attacker_token = pyjwt.encode(fake_payload, "attacker_secret", algorithm="HS256")
 
         with pytest.raises(Exception):
-            verify_token(attacker_token, token_type="access")
+            verify_access_token(attacker_token)
 
 
 # ════════════════════════════════════════════════════

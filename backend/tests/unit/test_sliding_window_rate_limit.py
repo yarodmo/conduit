@@ -119,10 +119,11 @@ class TestFixedWindowBypassPrevention:
 
         # Simulate: 4 requests at t=now-55 (still inside the 60s window)
         early_time = now - 55
+        ratelimit_key = f"ratelimit:{key}"
         for i in range(4):
             ts = early_time + i * 0.001  # microsecond spread
-            await redis.zadd(key, {f"hit:{i}": ts})
-        await redis.expire(key, window)
+            await redis.zadd(ratelimit_key, {f"hit:{i}": ts})
+        await redis.expire(ratelimit_key, window)
 
         # Now attempt 2 more — only 1 slot remains
         allowed1, _ = await check_rate_limit(key, limit=limit, window_seconds=window)
@@ -140,9 +141,10 @@ class TestFixedWindowBypassPrevention:
         now = time.time()
 
         # Inject 3 requests older than window (should NOT count)
+        ratelimit_key = f"ratelimit:{key}"
         for i in range(3):
             ts = now - 15 - i  # 15-17s ago
-            await redis.zadd(key, {f"old:{i}": ts})
+            await redis.zadd(ratelimit_key, {f"old:{i}": ts})
 
         # All 3 new requests should be allowed
         for i in range(3):

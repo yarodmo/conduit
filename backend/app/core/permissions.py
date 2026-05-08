@@ -137,7 +137,6 @@ ROLE_PERMISSIONS: dict[Role, set[Permission]] = {
         Permission.TAKEOFF_READ,
         Permission.TAKEOFF_RUN,
         Permission.BOM_READ,
-        Permission.BOM_EXPORT,
         Permission.PLAN_READ,
         Permission.AI_ANALYZE,
         Permission.AI_CHAT,

@@ -9,10 +9,12 @@ Prompt 3 Security:
 LAW: Never leak timing information in password comparison.
 """
 
+import base64
 import hashlib
 import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -40,21 +42,34 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 # ── JWT RS256 Token Management ──
 
+def _resolve_rsa_key(raw: str | None, file_path: str) -> str:
+    """Load RSA key: raw PEM or base64-encoded env var → file path → empty string."""
+    if raw:
+        if raw.strip().startswith("-----BEGIN"):
+            return raw
+        try:
+            return base64.b64decode(raw).decode()
+        except Exception:
+            return raw
+    path = Path(file_path)
+    if path.exists():
+        return path.read_text()
+    return ""
+
+
 def _get_private_key() -> str:
     """
     Get RSA private key for signing.
     LAW: In production, missing key = hard failure. No silent downgrade.
     """
-    key = settings.jwt_private_key
+    key = _resolve_rsa_key(settings.JWT_PRIVATE_KEY, settings.JWT_PRIVATE_KEY_PATH)
     if not key:
-        if settings.is_production:
-            msg = (
-                "FATAL: JWT_PRIVATE_KEY_PATH not configured or file missing. "
-                "Cannot start in production without RSA key."
+        if settings.ENVIRONMENT == "production":
+            raise RuntimeError(
+                "FATAL: RSA private key not configured. "
+                "Set JWT_PRIVATE_KEY (base64) env var for production."
             )
-            raise RuntimeError(msg)
-        # Dev-only fallback: HS256 with APP_SECRET_KEY
-        return settings.APP_SECRET_KEY
+        return settings.SECRET_KEY
     return key
 
 
@@ -63,21 +78,20 @@ def _get_public_key() -> str:
     Get RSA public key for verification.
     LAW: In production, missing key = hard failure.
     """
-    key = settings.jwt_public_key
+    key = _resolve_rsa_key(settings.JWT_PUBLIC_KEY, settings.JWT_PUBLIC_KEY_PATH)
     if not key:
-        if settings.is_production:
-            msg = (
-                "FATAL: JWT_PUBLIC_KEY_PATH not configured or file missing. "
-                "Cannot verify tokens in production without RSA key."
+        if settings.ENVIRONMENT == "production":
+            raise RuntimeError(
+                "FATAL: RSA public key not configured. "
+                "Set JWT_PUBLIC_KEY (base64) env var for production."
             )
-            raise RuntimeError(msg)
-        return settings.APP_SECRET_KEY
+        return settings.SECRET_KEY
     return key
 
 
 def _get_algorithm() -> str:
     """RS256 when RSA key present, HS256 dev-only fallback."""
-    if settings.jwt_private_key:
+    if _resolve_rsa_key(settings.JWT_PRIVATE_KEY, settings.JWT_PRIVATE_KEY_PATH):
         return "RS256"
     return "HS256"
 

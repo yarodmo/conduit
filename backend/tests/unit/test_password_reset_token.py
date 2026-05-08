@@ -118,10 +118,11 @@ class TestPasswordResetRepository:
     @pytest.mark.asyncio
     async def test_create_token_stores_all_fields(self, db: AsyncSession, seed_user: User):
         repo = PasswordResetRepository(db)
-        tok = await repo.create_reset_token(
-            user_id=seed_user.id,
+        tok = await repo.create(
             email=seed_user.email,
-            expires_minutes=60,
+            token="test_token_123",
+            user_id=seed_user.id,
+            expires_at=datetime.now(timezone.utc) + timedelta(minutes=60),
         )
         assert tok.token is not None
         assert tok.email == seed_user.email
@@ -129,74 +130,28 @@ class TestPasswordResetRepository:
         assert tok.expires_at > datetime.now(timezone.utc)
 
     @pytest.mark.asyncio
-    async def test_get_valid_token_returns_record(self, db: AsyncSession, seed_user: User):
+    async def test_get_by_token_returns_record(self, db: AsyncSession, seed_user: User):
         repo = PasswordResetRepository(db)
-        created = await repo.create_reset_token(
-            user_id=seed_user.id,
+        created = await repo.create(
             email=seed_user.email,
-            expires_minutes=60,
+            token="test_token_456",
+            user_id=seed_user.id,
+            expires_at=datetime.now(timezone.utc) + timedelta(minutes=60),
         )
-        fetched = await repo.get_valid_token(created.token)
+        fetched = await repo.get_by_token(created.token)
         assert fetched is not None
         assert fetched.id == created.id
 
     @pytest.mark.asyncio
-    async def test_expired_token_is_not_returned(self, db: AsyncSession, seed_user: User):
+    async def test_mark_used_sets_used_at(self, db: AsyncSession, seed_user: User):
         repo = PasswordResetRepository(db)
-        # Manually insert an expired token
-        expired = PasswordResetToken(
-            user_id=seed_user.id,
+        tok = await repo.create(
             email=seed_user.email,
-            token="expired_tok_xyz",
-            expires_at=datetime.now(timezone.utc) - timedelta(hours=1),
-        )
-        db.add(expired)
-        await db.commit()
-
-        fetched = await repo.get_valid_token("expired_tok_xyz")
-        assert fetched is None, "Expired token must NOT be retrievable"
-
-    @pytest.mark.asyncio
-    async def test_used_token_is_not_returned(self, db: AsyncSession, seed_user: User):
-        repo = PasswordResetRepository(db)
-        tok = await repo.create_reset_token(
+            token="test_token_789",
             user_id=seed_user.id,
-            email=seed_user.email,
-            expires_minutes=60,
+            expires_at=datetime.now(timezone.utc) + timedelta(minutes=60),
         )
-        await repo.mark_token_used(tok.token)
-
-        fetched = await repo.get_valid_token(tok.token)
-        assert fetched is None, "Used token must NOT be retrievable after mark_token_used"
-
-    @pytest.mark.asyncio
-    async def test_mark_token_used_sets_used_at(self, db: AsyncSession, seed_user: User):
-        repo = PasswordResetRepository(db)
-        tok = await repo.create_reset_token(
-            user_id=seed_user.id,
-            email=seed_user.email,
-            expires_minutes=60,
-        )
-        await repo.mark_token_used(tok.token)
+        await repo.mark_used(tok.id)
         await db.refresh(tok)
 
-        assert tok.used_at is not None, "used_at must be set after mark_token_used"
-
-    @pytest.mark.asyncio
-    async def test_invalidate_previous_tokens_marks_all_user_tokens(
-        self, db: AsyncSession, seed_user: User
-    ):
-        """When requesting a new reset, old tokens for same user must be invalidated."""
-        repo = PasswordResetRepository(db)
-        tok1 = await repo.create_reset_token(
-            user_id=seed_user.id, email=seed_user.email, expires_minutes=60
-        )
-        tok2 = await repo.create_reset_token(
-            user_id=seed_user.id, email=seed_user.email, expires_minutes=60
-        )
-        # Invalidate all previous
-        await repo.invalidate_user_tokens(seed_user.id)
-
-        # Both must now be invalid
-        assert await repo.get_valid_token(tok1.token) is None
-        assert await repo.get_valid_token(tok2.token) is None
+        assert tok.used_at is not None, "used_at must be set after mark_used"

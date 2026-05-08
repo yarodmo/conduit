@@ -29,7 +29,7 @@ logger = structlog.get_logger()
 async def lifespan(app: FastAPI):
     """Manage application lifecycle — startup and graceful shutdown."""
     # ── Startup ──
-    logger.info("conduit_starting", version="1.0.0", env=settings.APP_ENV)
+    logger.info("conduit_starting", version="1.0.0", env=settings.ENVIRONMENT)
 
     await init_redis()
     logger.info("redis_connected")
@@ -58,23 +58,23 @@ def create_app() -> FastAPI:
         title="Conduit API",
         description="MEP Intelligence. Connected. — Bliss Systems LLC",
         version="1.0.0",
-        docs_url="/api/docs" if settings.APP_ENV != "production" else None,
-        redoc_url="/api/redoc" if settings.APP_ENV != "production" else None,
-        openapi_url="/api/openapi.json" if settings.APP_ENV != "production" else None,
+        docs_url="/api/docs" if not settings.is_production else None,
+        redoc_url="/api/redoc" if not settings.is_production else None,
+        openapi_url="/api/openapi.json" if not settings.is_production else None,
         lifespan=lifespan,
     )
 
     # ── Security Middleware ──
-    if settings.APP_ENV == "production":
+    if settings.is_production:
         app.add_middleware(
             TrustedHostMiddleware,
-            allowed_hosts=["conduit.blissystems.com", "*.blissystems.com"],
+            allowed_hosts=settings.allowed_hosts_list,
         )
 
     # ── CORS ──
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.CORS_ORIGINS,
+        allow_origins=settings.cors_origins_list,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*", "X-Organization-ID"],
@@ -105,7 +105,7 @@ def create_app() -> FastAPI:
         return {
             "status": "healthy",
             "version": "1.0.0",
-            "environment": settings.APP_ENV,
+            "environment": settings.ENVIRONMENT,
         }
 
     return app
