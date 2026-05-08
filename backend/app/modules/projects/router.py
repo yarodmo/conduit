@@ -34,6 +34,7 @@ from app.modules.projects.schemas import (
     ProjectMemberResponse,
     ProjectMemberUpdateRoleRequest,
     ProjectResponse,
+    ProjectUpdateRequest,
 )
 from app.modules.projects.service import ProjectService
 
@@ -123,7 +124,6 @@ async def update_project(
     Update project details.
     Allowed: ORG_ADMIN, project OWNER, PROJECT_MANAGER.
     """
-    from app.modules.projects.schemas import ProjectUpdateRequest as _PUR
     svc = _get_service(db)
     return await svc.update_project(
         project_id=project_id,
