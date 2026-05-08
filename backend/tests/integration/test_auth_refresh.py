@@ -60,7 +60,7 @@ class TestTokenRefresh:
         # Second refresh with OLD token — must fail
         resp2 = await client.post("/api/v1/refresh", json={"refresh_token": old_refresh})
         assert resp2.status_code == 401
-        assert resp2.json()["code"] == "INVALID_REFRESH"
+        assert resp2.json()["code"] == "TOKEN_REVOKED"
 
     async def test_invalid_refresh_token_rejected(
         self, client: AsyncClient, free_plan, test_user
@@ -119,7 +119,7 @@ class TestLogout:
         # Attempt to refresh with revoked token
         resp = await client.post("/api/v1/refresh", json={"refresh_token": refresh_token})
         assert resp.status_code == 401
-        assert resp.json()["code"] == "INVALID_REFRESH"
+        assert resp.json()["code"] == "TOKEN_REVOKED"
 
     async def test_unauthenticated_logout_rejected(self, client: AsyncClient, free_plan, test_user):
         """Logout without bearer token must return 401."""
