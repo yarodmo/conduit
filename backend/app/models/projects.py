@@ -123,7 +123,6 @@ class Project(ConduitBase):
     )
 
     __table_args__ = (
-        Index("ix_projects_org_id", "org_id"),
         Index("ix_projects_type", "type"),
     )
 
@@ -160,5 +159,4 @@ class ProjectMember(ConduitBase):
 
     __table_args__ = (
         Index("ix_project_members_user_project", "user_id", "project_id", unique=True),
-        Index("ix_project_members_project_id", "project_id"),
     )

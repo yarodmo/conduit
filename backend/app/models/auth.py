@@ -197,7 +197,6 @@ class OrganizationMember(ConduitBase):
 
     __table_args__ = (
         Index("ix_org_members_user_org", "user_id", "org_id", unique=True),
-        Index("ix_org_members_org_id", "org_id"),
     )
 
 
@@ -320,8 +319,7 @@ class PasswordResetToken(ConduitBase):
     )
 
     __table_args__ = (
-        Index("ix_password_reset_token_tok", "token"),
-        Index("ix_password_reset_token_user", "user_id"),
+        Index("ix_password_reset_token_email", "email"),
     )
 
 
@@ -407,7 +405,5 @@ class AuditLog(AuditBase):
 
     __table_args__ = (
         Index("ix_audit_logs_entity", "entity_type", "entity_id"),
-        Index("ix_audit_logs_org", "org_id"),
-        Index("ix_audit_logs_user", "user_id"),
         Index("ix_audit_logs_created", "created_at"),
     )
