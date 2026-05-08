@@ -11,9 +11,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY backend/requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir poetry==1.8.3
+
+COPY backend/pyproject.toml backend/poetry.lock* ./
+RUN poetry export --without-hashes --without dev -f requirements.txt -o /tmp/requirements.txt \
+    && pip install --no-cache-dir -r /tmp/requirements.txt
+
 
 # ── Stage 2: Runtime ──────────────────────────────────────
 FROM python:3.12-slim AS runtime
