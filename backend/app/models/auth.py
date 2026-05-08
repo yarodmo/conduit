@@ -22,7 +22,8 @@ from sqlalchemy import (
     Text,
     func,
 )
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy import JSON
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import AuditBase, ConduitBase
@@ -147,10 +148,10 @@ class Organization(ConduitBase):
         Integer, nullable=True,
     )
     preferred_suppliers: Mapped[dict[str, Any] | None] = mapped_column(
-        JSONB, nullable=True, default=None,
+        JSON, nullable=True, default=None,
     )
     learned_materials: Mapped[dict[str, Any] | None] = mapped_column(
-        JSONB, nullable=True, default=None,
+        JSON, nullable=True, default=None,
     )
 
     # Relationships
@@ -347,7 +348,7 @@ class SubscriptionPlan(ConduitBase):
         Integer, nullable=False, default=0,  # Cents
     )
     limits: Mapped[dict[str, Any]] = mapped_column(
-        JSONB, nullable=False,
+        JSON, nullable=False,
         default={
             "max_projects": 3,
             "max_pages": 50,
@@ -392,10 +393,10 @@ class AuditLog(AuditBase):
         UUID(as_uuid=True), nullable=True, index=True,
     )
     before_state: Mapped[dict[str, Any] | None] = mapped_column(
-        JSONB, nullable=True,
+        JSON, nullable=True,
     )
     after_state: Mapped[dict[str, Any] | None] = mapped_column(
-        JSONB, nullable=True,
+        JSON, nullable=True,
     )
     ip_address: Mapped[str | None] = mapped_column(
         String(45), nullable=True,

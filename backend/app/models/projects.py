@@ -18,7 +18,8 @@ from sqlalchemy import (
     String,
     Text,
 )
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy import JSON
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import ConduitBase
@@ -113,7 +114,7 @@ class Project(ConduitBase):
         Boolean, default=True, nullable=False,
     )
     metadata_extra: Mapped[dict[str, Any] | None] = mapped_column(
-        JSONB, nullable=True, default=None,
+        JSON, nullable=True, default=None,
     )
 
     # Relationships
