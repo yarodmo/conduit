@@ -10,7 +10,7 @@ from typing import Any
 
 import structlog
 from fastapi import FastAPI, Request, status
-from fastapi.exceptions import RequestValidationError
+from fastapi.exceptions import RequestValidationError, HTTPException
 from fastapi.responses import JSONResponse
 
 logger = structlog.get_logger()
@@ -145,6 +145,28 @@ def register_error_handlers(app: FastAPI) -> None:
                 "error": "Validation failed",
                 "code": "VALIDATION_ERROR",
                 "details": {"errors": errors},
+            },
+        )
+
+    @app.exception_handler(HTTPException)
+    async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+        """Normalize FastAPI HTTPExceptions to APEX standard format."""
+        detail = exc.detail
+        if isinstance(detail, dict):
+            error_msg = detail.get("error", str(detail))
+            code = detail.get("code", "HTTP_ERROR")
+            details = detail.get("details", {})
+        else:
+            error_msg = str(detail)
+            code = "HTTP_ERROR"
+            details = {}
+
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={
+                "error": error_msg,
+                "code": code,
+                "details": details,
             },
         )
 
