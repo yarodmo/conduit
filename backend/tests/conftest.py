@@ -33,7 +33,7 @@ from app.core.security import hash_password
 from app.main import create_app
 from app.models import *  # noqa: F401, F403  — trigger all model registration
 from app.models.auth import OrgRole, Organization, OrganizationMember, SubscriptionPlan, User
-from app.models.base import ConduitBase
+from app.models.base import AuditBase, ConduitBase
 
 
 # ══════════════════════════════════════
@@ -55,10 +55,12 @@ async def engine():
 
     async with eng.begin() as conn:
         await conn.run_sync(ConduitBase.metadata.create_all)
+        await conn.run_sync(AuditBase.metadata.create_all)
 
     yield eng
 
     async with eng.begin() as conn:
+        await conn.run_sync(AuditBase.metadata.drop_all)
         await conn.run_sync(ConduitBase.metadata.drop_all)
 
     await eng.dispose()
