@@ -69,6 +69,11 @@ docker-compose.override.yml
 *~
 .DS_Store
 
+# ── Bliss / Claude local (never commit) ──
+.claude/
+BLISS_RESUME.md
+CONDUIT_BLUEPRINT.md
+
 # ── Logs ──
 *.log
 logs/
