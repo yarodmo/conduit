@@ -1,0 +1,116 @@
+# Conduit Backend — Production Docker Compose
+# VPS: 72.249.68.148 | Domain: api.climbpeakdigital.com
+# User: onecpd | Deploy dir: /home/onecpd/conduit
+#
+# Port allocation (isolated from other projects):
+#   API:      127.0.0.1:8000  (Nginx proxy target)
+#   Postgres: 127.0.0.1:5434  (hitdash=5433, ballbot=5432)
+#   Redis:    127.0.0.1:6381  (hitdash=6380)
+#
+# Bliss Systems LLC — APEX Standard
+
+services:
+  api:
+    image: ghcr.io/yarodmo/conduit:latest
+    container_name: conduit_api
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY}
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY}
+      SECRET_KEY: ${SECRET_KEY}
+      ENVIRONMENT: production
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_FROM: ${SMTP_FROM}
+      FRONTEND_URL: ${FRONTEND_URL:-https://climbpeakdigital.com}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-https://climbpeakdigital.com,https://api.climbpeakdigital.com}
+      CELERY_BROKER_URL: ${REDIS_URL}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - conduit_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  worker:
+    image: ghcr.io/yarodmo/conduit:latest
+    container_name: conduit_worker
+    restart: unless-stopped
+    command: celery -A app.core.celery_app worker --loglevel=info --concurrency=2
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_FROM: ${SMTP_FROM}
+      ENVIRONMENT: production
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - conduit_net
+
+  db:
+    image: postgres:16-alpine
+    container_name: conduit_db
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5434:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-conduit}
+      POSTGRES_USER: ${POSTGRES_USER:-conduit}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - conduit_pgdata:/var/lib/postgresql/data
+    networks:
+      - conduit_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-conduit}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: conduit_redis
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6381:6379"
+    command: redis-server --requirepass ${REDIS_PASSWORD} --maxmemory 128mb --maxmemory-policy allkeys-lru
+    volumes:
+      - conduit_redisdata:/data
+    networks:
+      - conduit_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  conduit_pgdata:
+    driver: local
+  conduit_redisdata:
+    driver: local
+
+networks:
+  conduit_net:
+    driver: bridge
+    name: conduit_net
