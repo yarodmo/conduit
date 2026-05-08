@@ -506,7 +506,7 @@ class AuthService:
             name=org.name,
             slug=org.slug,
             logo_url=org.logo_url,
-            member_count=len(members),
+            member_count=len(member_responses),
             plan_name=plan_name,
             created_at=org.created_at,
             members=member_responses,
