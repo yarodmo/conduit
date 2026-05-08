@@ -14,6 +14,8 @@ import re
 import uuid
 from datetime import datetime, timedelta, timezone
 
+from app.core.utils import ensure_utc
+
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -188,9 +190,9 @@ class AuthService:
             raise AccountLockedError(retry_after=ttl)
 
         # Check database-level lockout
-        if user.locked_until and user.locked_until > datetime.now(timezone.utc):
+        if user.locked_until and ensure_utc(user.locked_until) > datetime.now(timezone.utc):
             raise AccountLockedError(
-                retry_after=int((user.locked_until - datetime.now(timezone.utc)).total_seconds()),
+                retry_after=int((ensure_utc(user.locked_until) - datetime.now(timezone.utc)).total_seconds()),
             )
 
         # Verify password
@@ -277,7 +279,7 @@ class AuthService:
 
         # Blacklist old token in Redis
         remaining_seconds = int(
-            (session.expires_at - datetime.now(timezone.utc)).total_seconds()
+            (ensure_utc(session.expires_at) - datetime.now(timezone.utc)).total_seconds()
         )
         if remaining_seconds > 0:
             await blacklist_refresh_token(token_hash, remaining_seconds)
@@ -307,7 +309,7 @@ class AuthService:
             await self.session_repo.revoke_session(session.id)
 
             remaining = int(
-                (session.expires_at - datetime.now(timezone.utc)).total_seconds()
+                (ensure_utc(session.expires_at) - datetime.now(timezone.utc)).total_seconds()
             )
             if remaining > 0:
                 await blacklist_refresh_token(token_hash, remaining)
@@ -375,7 +377,7 @@ class AuthService:
         if not reset_record or reset_record.used_at is not None:
             raise AuthenticationError("Invalid or expired reset token", "INVALID_RESET_TOKEN")
 
-        if reset_record.expires_at < datetime.now(timezone.utc):
+        if ensure_utc(reset_record.expires_at) < datetime.now(timezone.utc):
             raise AuthenticationError("Reset token has expired", "TOKEN_EXPIRED")
 
         user = await self.auth_repo.get_by_email(reset_record.email)
