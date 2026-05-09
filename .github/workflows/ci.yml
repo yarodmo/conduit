@@ -211,28 +211,25 @@ jobs:
             # Run migrations
             docker exec --workdir /app conduit_api alembic upgrade head
 
-            # Network diagnostics
-            echo "=== Port 8000 on host ==="
-            ss -tlnp | grep ':8000' || echo "(nothing on 8000)"
-            echo "=== Docker port mapping ==="
-            docker port conduit_api || true
-            echo "=== Health from INSIDE container ==="
-            docker exec conduit_api curl -sf http://127.0.0.1:8000/health && echo "INTERNAL OK" || echo "INTERNAL FAILED"
+            # Health check — retry 20x / 5s = 100s max
+            echo "Waiting for app on port 8000..."
+            APP_OK=0
+            for i in $(seq 1 20); do
+              if curl -sf http://127.0.0.1:8000/health > /dev/null 2>&1; then
+                echo "✅ App healthy (attempt $i)"
+                APP_OK=1
+                break
+              fi
+              echo "  attempt $i: not ready"; sleep 5
+            done
 
-            # Check if another service holds port 8000
-            echo "=== All listeners on localhost ==="
-            ss -tlnp | grep '127.0.0.1' || true
+            docker logs conduit_api --tail 20 2>&1 || true
 
-            # Try the health check
-            sleep 5
-            echo "=== External curl ==="
-            curl -v http://127.0.0.1:8000/health 2>&1 || true
-
-            # Dump container logs
-            echo "=== conduit_api last 30 lines ==="
-            docker logs conduit_api --tail 30 2>&1 || true
-
-            echo "✅ Conduit deployed successfully"
+            if [ "$APP_OK" != "1" ]; then
+              echo "❌ App never became healthy — rolling back"
+              docker compose -f docker-compose.prod.yml down
+              exit 1
+            fi
 
             echo "✅ Conduit deployed successfully"
 
