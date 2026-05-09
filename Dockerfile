@@ -14,8 +14,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN pip install --no-cache-dir poetry==1.8.3
 
 COPY backend/pyproject.toml backend/poetry.lock* ./
-RUN poetry export --without-hashes --without dev -f requirements.txt -o /tmp/requirements.txt \
-    && pip install --no-cache-dir -r /tmp/requirements.txt
+
+# Install deps directly into a venv — avoids poetry-plugin-export bugs
+RUN poetry config virtualenvs.in-project true \
+    && poetry install --without dev --no-root --no-interaction --no-ansi
 
 
 # ── Stage 2: Runtime ──────────────────────────────────────
@@ -27,9 +29,9 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy installed packages from builder
-COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
-COPY --from=builder /usr/local/bin /usr/local/bin
+# Copy venv from builder
+COPY --from=builder /app/.venv /app/.venv
+ENV PATH="/app/.venv/bin:$PATH"
 
 # Copy application code
 COPY backend/ .
