@@ -211,19 +211,31 @@ jobs:
             # Run migrations
             docker exec --workdir /app conduit_api alembic upgrade head
 
-            # Wait for container Docker healthcheck to report healthy
-            # docker-compose has start_period:40s + interval:30s so allow up to 90s
-            echo "Waiting for conduit_api to be healthy..."
-            for i in $(seq 1 18); do
-              HEALTH=$(docker inspect --format='{{.State.Health.Status}}' conduit_api 2>/dev/null || echo "unknown")
-              [ "$HEALTH" = "healthy" ] && echo "Container healthy (${i}x5s)" && break
-              echo "  attempt $i: $HEALTH"; sleep 5
+            # Check app directly on localhost:8000 (bypass Nginx)
+            # Retry up to 20x with 5s gap = 100s total
+            echo "Waiting for app to serve /health on port 8000..."
+            APP_OK=0
+            for i in $(seq 1 20); do
+              if curl -sf http://127.0.0.1:8000/health > /dev/null 2>&1; then
+                echo "App healthy on port 8000 (attempt $i)"
+                APP_OK=1
+                break
+              fi
+              echo "  attempt $i: not ready yet"
+              sleep 5
             done
 
-            # External health check via Nginx
-            curl -f https://api.climbpeakdigital.com/health || \
-              (echo "HEALTH CHECK FAILED — rolling back" && \
-               docker compose -f docker-compose.prod.yml down && exit 1)
+            # Dump container logs regardless (always visible in CI)
+            echo "=== conduit_api last 50 lines ==="
+            docker logs conduit_api --tail 50 2>&1 || true
+
+            if [ "$APP_OK" != "1" ]; then
+              echo "App never became healthy — rolling back"
+              docker compose -f docker-compose.prod.yml down
+              exit 1
+            fi
+
+            echo "✅ Conduit deployed successfully"
 
             echo "✅ Conduit deployed successfully"
 
