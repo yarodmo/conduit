@@ -200,23 +200,27 @@ jobs:
             # Rolling restart (zero downtime)
             docker compose -f docker-compose.prod.yml up -d --remove-orphans
 
-            # Wait for API container to be running before migrations
-            echo "Waiting for conduit_api to be ready..."
-            for i in $(seq 1 24); do
+            # Wait for container to be running (needed before alembic exec)
+            echo "Waiting for conduit_api to start..."
+            for i in $(seq 1 12); do
               STATUS=$(docker inspect --format='{{.State.Status}}' conduit_api 2>/dev/null || echo "missing")
-              if [ "$STATUS" = "running" ]; then
-                echo "Container running after ${i}x5s"
-                break
-              fi
-              echo "  attempt $i: status=$STATUS"
-              sleep 5
+              [ "$STATUS" = "running" ] && echo "Container running (${i}x5s)" && break
+              echo "  attempt $i: $STATUS"; sleep 5
             done
 
             # Run migrations
             docker exec --workdir /app conduit_api alembic upgrade head
 
-            # Health check
-            sleep 15
+            # Wait for container Docker healthcheck to report healthy
+            # docker-compose has start_period:40s + interval:30s so allow up to 90s
+            echo "Waiting for conduit_api to be healthy..."
+            for i in $(seq 1 18); do
+              HEALTH=$(docker inspect --format='{{.State.Health.Status}}' conduit_api 2>/dev/null || echo "unknown")
+              [ "$HEALTH" = "healthy" ] && echo "Container healthy (${i}x5s)" && break
+              echo "  attempt $i: $HEALTH"; sleep 5
+            done
+
+            # External health check via Nginx
             curl -f https://api.climbpeakdigital.com/health || \
               (echo "HEALTH CHECK FAILED — rolling back" && \
                docker compose -f docker-compose.prod.yml down && exit 1)
