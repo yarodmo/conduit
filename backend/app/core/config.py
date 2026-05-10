@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     APP_PORT: int = 8000
     SECRET_KEY: str = "CHANGE_ME"
     ALLOWED_ORIGINS: str = "http://localhost:5173"
-    ALLOWED_HOSTS: str = "api.climbpeakdigital.com,conduit.blissystems.com,*.blissystems.com"
+    ALLOWED_HOSTS: str = "api.climbpeakdigital.com,conduit.blissystems.com,*.blissystems.com,localhost,127.0.0.1"
 
     # ── Database ──
     DATABASE_URL: str = "postgresql+asyncpg://conduit:conduit@localhost:5432/conduit"
