@@ -172,15 +172,27 @@ jobs:
             ENVEOF
             chmod 600 ${{ secrets.VPS_DEPLOY_PATH }}/.env
 
-      - name: Copy docker-compose to VPS
+      - name: Copy docker-compose + .htaccess to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
           port: ${{ secrets.VPS_PORT }}
-          source: "docker-compose.prod.yml"
+          source: "docker-compose.prod.yml,deploy/.htaccess"
           target: ${{ secrets.VPS_DEPLOY_PATH }}/
+          strip_components: 0
+
+      - name: Move .htaccess to deploy root
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            cp ${{ secrets.VPS_DEPLOY_PATH }}/deploy/.htaccess ${{ secrets.VPS_DEPLOY_PATH }}/.htaccess
+            rm -rf ${{ secrets.VPS_DEPLOY_PATH }}/deploy
 
       - name: Deploy containers
         uses: appleboy/ssh-action@v1.0.3
@@ -212,16 +224,25 @@ jobs:
             docker exec --workdir /app conduit_api alembic upgrade head
 
             # Health check — retry 20x / 5s = 100s max
-            echo "Waiting for app on port 8000..."
+            # Port 3007 (CSF whitelist 3000:3200, alineado con hitdash 3005)
+            echo "Waiting for app on port 3007..."
             APP_OK=0
             for i in $(seq 1 20); do
-              if curl -sf http://127.0.0.1:8000/health > /dev/null 2>&1; then
+              if curl -sf http://127.0.0.1:3007/health > /dev/null 2>&1; then
                 echo "✅ App healthy (attempt $i)"
                 APP_OK=1
                 break
               fi
               echo "  attempt $i: not ready"; sleep 5
             done
+
+            # Public health via Apache + HTTPS
+            if [ "$APP_OK" = "1" ]; then
+              echo "Validating public endpoint..."
+              curl -sf -m 15 https://api.climbpeakdigital.com/health \
+                && echo "✅ Public HTTPS healthy" \
+                || echo "⚠️  Internal OK but public failed (Apache/SSL?)"
+            fi
 
             docker logs conduit_api --tail 20 2>&1 || true
 

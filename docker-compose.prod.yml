@@ -1,11 +1,11 @@
 # Conduit Backend — Production Docker Compose
 # VPS: 72.249.68.148 | Domain: api.climbpeakdigital.com
-# User: onecpd | Deploy dir: /home/onecpd/conduit
+# User: onecpd | Deploy dir: /home/onecpd/api.climbpeakdigital.com
 #
-# Port allocation (isolated from other projects):
-#   API:      127.0.0.1:8000  (Nginx proxy target)
-#   Postgres: 127.0.0.1:5434  (hitdash=5433, ballbot=5432)
-#   Redis:    127.0.0.1:6381  (hitdash=6380)
+# Port allocation (CSF firewall TCP_IN whitelist: 3000:3200):
+#   API:      127.0.0.1:3007  (Apache .htaccess proxy target — hitdash uses 3005)
+#   Postgres: 127.0.0.1:5434  (internal-only debug; CSF blocks external)
+#   Redis:    127.0.0.1:6381  (internal-only debug; CSF blocks external)
 #
 # Bliss Systems LLC — APEX Standard
 
@@ -15,7 +15,7 @@ services:
     container_name: conduit_api
     restart: unless-stopped
     ports:
-      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:3007:8000"
     environment:
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: ${REDIS_URL}

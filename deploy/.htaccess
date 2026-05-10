@@ -1,0 +1,8 @@
+# BLISS APEX ROUTER (DOCKER)
+# Conduit API → Docker container on 127.0.0.1:3007
+# CSF TCP_IN range 3000:3200 | Pattern matches dash.ballbot.tel:3005
+RewriteEngine On
+RewriteCond %{HTTPS} off
+RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+RewriteRule ^(.*)$ http://127.0.0.1:3007/$1 [P,L]
