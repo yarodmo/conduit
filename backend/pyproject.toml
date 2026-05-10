@@ -17,6 +17,7 @@ pydantic-settings = "^2.6.0"
 email-validator = "^2.1.0"
 sqlalchemy = {extras = ["asyncio"], version = "^2.0.35"}
 asyncpg = "^0.30.0"
+psycopg2-binary = "^2.9.0"
 alembic = "^1.14.0"
 celery = {extras = ["redis"], version = "^5.4.0"}
 redis = "^5.2.0"
