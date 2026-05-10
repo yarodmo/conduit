@@ -9,6 +9,7 @@ import structlog
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.core.config import settings
 from app.core.database import engine, init_db
@@ -62,6 +63,13 @@ def create_app() -> FastAPI:
         openapi_url="/api/openapi.json" if not settings.is_production else None,
         lifespan=lifespan,
     )
+
+    # ── Trusted Hosts (security — must wrap before CORS) ──
+    if settings.is_production:
+        app.add_middleware(
+            TrustedHostMiddleware,
+            allowed_hosts=settings.allowed_hosts_list,
+        )
 
     # ── CORS ──
     app.add_middleware(

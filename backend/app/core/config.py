@@ -15,7 +15,7 @@ class Settings(BaseSettings):
 
     # ── Application ──
     ENVIRONMENT: str = "development"
-    APP_DEBUG: bool = True
+    APP_DEBUG: bool = False
     APP_HOST: str = "0.0.0.0"
     APP_PORT: int = 8000
     SECRET_KEY: str = "CHANGE_ME"
