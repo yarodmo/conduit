@@ -16,6 +16,7 @@ from app.core.database import engine, init_db
 from app.core.redis import close_redis, init_redis
 from app.middleware.error_handler import register_error_handlers
 from app.modules.auth.router import router as auth_router
+from app.modules.plans.router import router as plans_router
 from app.modules.projects.router import router as projects_router
 
 logger = structlog.get_logger()
@@ -92,6 +93,10 @@ def create_app() -> FastAPI:
     )
     app.include_router(
         projects_router,
+        prefix="/api/v1",
+    )
+    app.include_router(
+        plans_router,
         prefix="/api/v1",
     )
 

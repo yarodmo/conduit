@@ -14,6 +14,7 @@ from app.models.auth import (
     UserSession,
 )
 from app.models.base import AuditBase, ConduitBase
+from app.models.plans import Plan, PlanPage, PlanProcessingJob
 from app.models.projects import Project, ProjectMember
 
 __all__ = [
@@ -29,4 +30,7 @@ __all__ = [
     "AuditLog",
     "Project",
     "ProjectMember",
+    "Plan",
+    "PlanPage",
+    "PlanProcessingJob",
 ]
