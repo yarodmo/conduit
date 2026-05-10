@@ -15,7 +15,7 @@ services:
     container_name: conduit_api
     restart: unless-stopped
     ports:
-      - "127.0.0.1:3007:8000"
+      - "127.0.0.1:3007:3007"
     environment:
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: ${REDIS_URL}
@@ -39,7 +39,7 @@ services:
     networks:
       - conduit_net
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:3007/health"]
       interval: 30s
       timeout: 10s
       retries: 3

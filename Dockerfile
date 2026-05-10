@@ -40,9 +40,13 @@ COPY backend/ .
 RUN useradd -m -u 1000 conduit && chown -R conduit:conduit /app
 USER conduit
 
-EXPOSE 8000
+# Port 3007 — within CSF TCP_IN whitelist (3000:3200) on shared VPS.
+# Pattern aligned with hitdash:3001/3005. Container internal AND host
+# binding must both be in whitelisted range, otherwise CSF RSTs traffic
+# even on Docker bridge IPs.
+EXPOSE 3007
 
 # Production: uvicorn with multiple workers
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", \
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "3007", \
      "--workers", "2", "--loop", "uvloop", "--http", "httptools", \
      "--no-access-log"]
