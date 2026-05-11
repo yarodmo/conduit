@@ -16,6 +16,7 @@ from app.models.auth import (
 from app.models.base import AuditBase, ConduitBase
 from app.models.plans import Plan, PlanPage, PlanProcessingJob
 from app.models.projects import Project, ProjectMember
+from app.models.takeoff import MaterialCatalog, TakeoffItem, TakeoffJob
 
 __all__ = [
     "ConduitBase",
@@ -33,4 +34,7 @@ __all__ = [
     "Plan",
     "PlanPage",
     "PlanProcessingJob",
+    "TakeoffJob",
+    "TakeoffItem",
+    "MaterialCatalog",
 ]

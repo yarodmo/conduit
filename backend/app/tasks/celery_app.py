@@ -49,7 +49,12 @@ celery_app.conf.update(
 
     # Concurrency per worker type
     worker_concurrency=4,
-)
 
-# Auto-discover tasks
-celery_app.autodiscover_tasks(["app.tasks"])
+    # Explicit include — autodiscover_tasks(["app.tasks"]) looks for
+    # app.tasks.tasks (doesn't exist). include is the correct pattern.
+    include=[
+        "app.tasks.email_tasks",
+        "app.tasks.plan_tasks",
+        "app.tasks.ai_tasks",
+    ],
+)
