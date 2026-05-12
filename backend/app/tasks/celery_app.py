@@ -56,5 +56,14 @@ celery_app.conf.update(
         "app.tasks.email_tasks",
         "app.tasks.plan_tasks",
         "app.tasks.ai_tasks",
+        "app.tasks.sla_tasks",
     ],
+
+    # Celery beat — periodic tasks
+    beat_schedule={
+        "check-rfi-sla-hourly": {
+            "task": "app.tasks.sla_tasks.check_rfi_sla",
+            "schedule": 3600.0,  # every hour
+        },
+    },
 )

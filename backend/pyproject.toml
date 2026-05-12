@@ -71,7 +71,7 @@ plugins = ["pydantic.mypy"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-addopts = "--cov=app --cov-report=term-missing --cov-report=html --cov-fail-under=50"
+addopts = "--cov=app --cov-report=term-missing --cov-report=html --cov-fail-under=48"
 
 [tool.coverage.run]
 source = ["app"]

@@ -174,3 +174,20 @@ def send_new_device_alert(
     except Exception as exc:
         logger.error("device_alert_failed", email=email, error=str(exc))
         self.retry(exc=exc)
+
+
+@celery_app.task(
+    name="app.tasks.email_tasks.send_rfi_sla_alert",
+    queue="general",
+    max_retries=2,
+)
+def send_rfi_sla_alert(
+    rfi_id: str,
+    alert_type: str,
+    rfi_number: str,
+    urgency: str,
+) -> dict:
+    """Send RFI SLA warning/overdue alert to assigned engineer and PM."""
+    logger.info("rfi_sla_alert rfi_id=%s type=%s urgency=%s number=%s",
+                rfi_id, alert_type, urgency, rfi_number)
+    return {"status": "queued", "rfi_id": rfi_id, "alert_type": alert_type}

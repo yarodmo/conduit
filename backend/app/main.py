@@ -18,6 +18,7 @@ from app.middleware.error_handler import register_error_handlers
 from app.modules.auth.router import router as auth_router
 from app.modules.plans.router import router as plans_router
 from app.modules.projects.router import router as projects_router
+from app.modules.rfis.router import router as rfis_router
 from app.modules.takeoff.router import router as takeoff_router
 
 logger = structlog.get_logger()
@@ -102,6 +103,10 @@ def create_app() -> FastAPI:
     )
     app.include_router(
         takeoff_router,
+        prefix="/api/v1",
+    )
+    app.include_router(
+        rfis_router,
         prefix="/api/v1",
     )
 
