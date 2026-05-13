@@ -54,6 +54,7 @@ celery_app.conf.update(
     # app.tasks.tasks (doesn't exist). include is the correct pattern.
     include=[
         "app.tasks.email_tasks",
+        "app.tasks.notification_tasks",
         "app.tasks.plan_tasks",
         "app.tasks.ai_tasks",
         "app.tasks.sla_tasks",
