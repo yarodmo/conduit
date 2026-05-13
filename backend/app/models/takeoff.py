@@ -120,3 +120,11 @@ class MaterialCatalog(ConduitBase):
     supplier_contact: Mapped[str | None] = mapped_column(String(512), nullable=True)
     supplier_lead_days: Mapped[int | None] = mapped_column(Integer(), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean(), nullable=False, default=True)
+    # M12 extensions
+    tag_prefix: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    category: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    description: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    is_custom: Mapped[bool] = mapped_column(Boolean(), nullable=False, default=False)
+    supplier_sku: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # embedding: JSON list of floats (PostgreSQL casts to vector for similarity search)
+    embedding: Mapped[list | None] = mapped_column(JSON(), nullable=True)
