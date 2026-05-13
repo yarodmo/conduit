@@ -16,6 +16,7 @@ from app.models.auth import (
 from app.models.base import AuditBase, ConduitBase
 from app.models.field import FieldPhoto, WorkZone, ZoneProgressReport
 from app.models.notifications import FCMToken, Notification, NotificationPreference
+from app.models.reports import ReportJob
 from app.models.plans import Plan, PlanPage, PlanProcessingJob
 from app.models.projects import Project, ProjectMember
 from app.models.rfis import ChangeOrder, Markup, RFI, RFIComment
@@ -50,4 +51,5 @@ __all__ = [
     "Notification",
     "NotificationPreference",
     "FCMToken",
+    "ReportJob",
 ]

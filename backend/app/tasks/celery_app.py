@@ -58,6 +58,7 @@ celery_app.conf.update(
         "app.tasks.plan_tasks",
         "app.tasks.ai_tasks",
         "app.tasks.sla_tasks",
+        "app.tasks.report_tasks",
     ],
 
     # Celery beat — periodic tasks
