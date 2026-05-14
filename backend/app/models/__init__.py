@@ -16,6 +16,7 @@ from app.models.auth import (
 from app.models.base import AuditBase, ConduitBase
 from app.models.field import FieldPhoto, WorkZone, ZoneProgressReport
 from app.models.notifications import FCMToken, Notification, NotificationPreference
+from app.models.assistant import AssistantCache, AssistantConversation, AssistantMessage
 from app.models.catalog import CatalogImportJob, CatalogSupplier
 from app.models.collaboration import CollabSession, SessionParticipant
 from app.models.reports import ReportJob
@@ -58,4 +59,7 @@ __all__ = [
     "SessionParticipant",
     "CatalogSupplier",
     "CatalogImportJob",
+    "AssistantConversation",
+    "AssistantMessage",
+    "AssistantCache",
 ]

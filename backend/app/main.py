@@ -17,6 +17,7 @@ from app.core.redis import close_redis, init_redis
 from app.middleware.error_handler import register_error_handlers
 from app.modules.auth.router import router as auth_router
 from app.modules.field.router import router as field_router
+from app.modules.assistant.router import router as assistant_router
 from app.modules.collaboration.router import router as collaboration_router
 from app.modules.materials.router import router as catalog_router
 from app.modules.notifications.router import router as notifications_router
@@ -132,6 +133,10 @@ def create_app() -> FastAPI:
     )
     app.include_router(
         catalog_router,
+        prefix="/api/v1",
+    )
+    app.include_router(
+        assistant_router,
         prefix="/api/v1",
     )
 
