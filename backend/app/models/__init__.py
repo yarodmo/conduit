@@ -18,6 +18,7 @@ from app.models.field import FieldPhoto, WorkZone, ZoneProgressReport
 from app.models.notifications import FCMToken, Notification, NotificationPreference
 from app.models.assistant import AssistantCache, AssistantConversation, AssistantMessage
 from app.models.learning import LearningCorrectionEvent, LearningInsight
+from app.models.security import SecurityEvent
 from app.models.catalog import CatalogImportJob, CatalogSupplier
 from app.models.collaboration import CollabSession, SessionParticipant
 from app.models.reports import ReportJob
@@ -65,4 +66,5 @@ __all__ = [
     "AssistantCache",
     "LearningInsight",
     "LearningCorrectionEvent",
+    "SecurityEvent",
 ]

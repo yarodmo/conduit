@@ -15,7 +15,9 @@ from app.core.config import settings
 from app.core.database import engine, init_db
 from app.core.redis import close_redis, init_redis
 from app.middleware.error_handler import register_error_handlers
+from app.middleware.security import SecurityMiddleware
 from app.modules.auth.router import router as auth_router
+from app.modules.security.router import router as security_router
 from app.modules.field.router import router as field_router
 from app.modules.assistant.router import router as assistant_router
 from app.modules.learning.router import router as learning_router
@@ -81,6 +83,9 @@ def create_app() -> FastAPI:
             allowed_hosts=settings.allowed_hosts_list,
         )
 
+    # ── Security headers + attack detection (outermost — runs on every request) ──
+    app.add_middleware(SecurityMiddleware, is_production=settings.is_production)
+
     # ── CORS ──
     app.add_middleware(
         CORSMiddleware,
@@ -142,6 +147,10 @@ def create_app() -> FastAPI:
     )
     app.include_router(
         learning_router,
+        prefix="/api/v1",
+    )
+    app.include_router(
+        security_router,
         prefix="/api/v1",
     )
 

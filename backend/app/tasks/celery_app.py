@@ -61,6 +61,7 @@ celery_app.conf.update(
         "app.tasks.report_tasks",
         "app.tasks.catalog_tasks",
         "app.tasks.learning_tasks",
+        "app.tasks.security_tasks",
     ],
 
     # Celery beat — periodic tasks
@@ -71,7 +72,11 @@ celery_app.conf.update(
         },
         "learning-analysis-nightly": {
             "task": "app.tasks.learning_tasks.run_learning_analysis",
-            "schedule": 86400.0,  # every 24h
+            "schedule": 86400.0,
+        },
+        "security-digest-daily": {
+            "task": "app.tasks.security_tasks.send_daily_security_digest",
+            "schedule": 86400.0,
         },
     },
 )
