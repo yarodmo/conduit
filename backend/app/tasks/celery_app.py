@@ -60,13 +60,18 @@ celery_app.conf.update(
         "app.tasks.sla_tasks",
         "app.tasks.report_tasks",
         "app.tasks.catalog_tasks",
+        "app.tasks.learning_tasks",
     ],
 
     # Celery beat — periodic tasks
     beat_schedule={
         "check-rfi-sla-hourly": {
             "task": "app.tasks.sla_tasks.check_rfi_sla",
-            "schedule": 3600.0,  # every hour
+            "schedule": 3600.0,
+        },
+        "learning-analysis-nightly": {
+            "task": "app.tasks.learning_tasks.run_learning_analysis",
+            "schedule": 86400.0,  # every 24h
         },
     },
 )
