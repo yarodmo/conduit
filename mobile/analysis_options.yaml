@@ -1,0 +1,26 @@
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  exclude:
+    - "**/*.g.dart"
+    - "**/*.freezed.dart"
+    - "build/**"
+  errors:
+    invalid_annotation_target: ignore
+  language:
+    strict-casts: true
+    strict-inference: true
+    strict-raw-types: true
+  plugins:
+    - custom_lint
+
+linter:
+  rules:
+    # Style — applied to all Conduit code
+    prefer_single_quotes: true
+    require_trailing_commas: true
+    sort_constructors_first: true
+    always_use_package_imports: true
+    avoid_print: true
+    # Disabled — clashes with Riverpod patterns
+    avoid_classes_with_only_static_members: false
