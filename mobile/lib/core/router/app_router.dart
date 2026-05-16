@@ -6,6 +6,8 @@ import 'package:conduit_mobile/features/auth/providers.dart';
 import 'package:conduit_mobile/features/jobs/presentation/my_jobs_screen.dart';
 import 'package:conduit_mobile/features/plan_viewer/presentation/plan_viewer_screen.dart';
 import 'package:conduit_mobile/features/progress/presentation/progress_report_screen.dart';
+import 'package:conduit_mobile/features/rfis/presentation/rfi_detail_screen.dart';
+import 'package:conduit_mobile/features/rfis/presentation/rfi_list_screen.dart';
 
 /// Route name constants — use these instead of raw strings.
 class Routes {
@@ -56,6 +58,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (_, state) => ProgressReportScreen(
           projectId: state.pathParameters['projectId']!,
           zoneId: state.pathParameters['zoneId']!,
+        ),
+      ),
+      GoRoute(
+        path: Routes.rfiList,
+        builder: (_, __) => const RfiListScreen(),
+      ),
+      GoRoute(
+        path: '/rfis/:rfiId',
+        builder: (_, state) => RfiDetailScreen(
+          rfiId: state.pathParameters['rfiId']!,
         ),
       ),
       // Additional routes registered in subsequent turns

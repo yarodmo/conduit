@@ -22,6 +22,11 @@ class MyJobsScreen extends ConsumerWidget {
         actions: [
           const SyncStatusIndicator(),
           IconButton(
+            icon: const Icon(Icons.assignment_outlined),
+            tooltip: 'RFIs',
+            onPressed: () => context.push('/rfis'),
+          ),
+          IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Sign out',
             onPressed: () =>
