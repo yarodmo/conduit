@@ -4,8 +4,8 @@ publish_to: "none"
 version: 0.1.0+1
 
 environment:
-  sdk: ^3.5.0
-  flutter: ">=3.24.0"
+  sdk: ^3.6.0
+  flutter: ">=3.27.0"
 
 dependencies:
   flutter:
@@ -67,7 +67,7 @@ dev_dependencies:
   json_serializable: ^6.9.0
   hive_ce_generator: ^1.7.0
   mocktail: ^1.0.4
-  custom_lint: ^0.6.4
+  custom_lint: ^0.7.0
   riverpod_lint: ^2.6.3
 
 flutter:
