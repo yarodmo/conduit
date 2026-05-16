@@ -1,7 +1,7 @@
 # Conduit Mobile — Flutter App
 
 Field technician app for Conduit MEP platform.
-**Status:** Sprint 5 — foundation in place, features building turn by turn.
+**Status:** Sprint 5 complete (7 turns) — auth, my jobs, plan viewer, progress reports, RFI viewer, FCM push, offline sync engine. Hand-authored Dart with CI running `flutter analyze` + `flutter test` on every push touching `mobile/`.
 
 ## Quick start (first time)
 
