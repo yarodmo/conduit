@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:conduit_mobile/features/auth/presentation/login_screen.dart';
 import 'package:conduit_mobile/features/auth/providers.dart';
 import 'package:conduit_mobile/features/jobs/presentation/my_jobs_screen.dart';
+import 'package:conduit_mobile/features/plan_viewer/presentation/plan_viewer_screen.dart';
 
 /// Route name constants — use these instead of raw strings.
 class Routes {
@@ -42,6 +43,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.myJobs,
         builder: (_, __) => const MyJobsScreen(),
+      ),
+      GoRoute(
+        path: '/plans/:planId',
+        builder: (_, state) => PlanViewerScreen(
+          planId: state.pathParameters['planId']!,
+        ),
       ),
       // Additional routes registered in subsequent turns
     ],
