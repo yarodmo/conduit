@@ -14,8 +14,10 @@ dependencies:
     sdk: flutter
 
   # ── State management ─────────────────────────────────────────────
+  # We use the manual Riverpod API (Provider, NotifierProvider, etc.) —
+  # no @riverpod annotations, so riverpod_annotation/_generator/_lint
+  # are deliberately omitted.
   flutter_riverpod: ^2.5.1
-  riverpod_annotation: ^2.3.5
 
   # ── Routing ──────────────────────────────────────────────────────
   go_router: ^14.6.0
@@ -61,14 +63,13 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
-  riverpod_generator: ^2.6.3
+  # Code generation: only the three actively used by lib/ + test/ files.
   build_runner: ^2.4.13
   retrofit_generator: ^9.1.5
   json_serializable: ^6.9.0
   hive_ce_generator: ^1.7.0
+  # Mocking
   mocktail: ^1.0.4
-  custom_lint: ^0.7.0
-  riverpod_lint: ^2.6.3
 
 flutter:
   uses-material-design: true
