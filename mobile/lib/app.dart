@@ -4,6 +4,7 @@ import 'package:conduit_mobile/core/config/theme.dart';
 import 'package:conduit_mobile/core/notifications/fcm_service.dart';
 import 'package:conduit_mobile/core/notifications/notification_handler.dart';
 import 'package:conduit_mobile/core/router/app_router.dart';
+import 'package:conduit_mobile/features/auth/domain/user.dart';
 import 'package:conduit_mobile/features/auth/providers.dart';
 import 'package:conduit_mobile/shared/sync/sync_engine.dart';
 
@@ -23,7 +24,7 @@ class _ConduitAppState extends ConsumerState<ConduitApp> {
     ref.read(syncEngineProvider).start();
 
     // Register FCM token once a user is logged in.
-    ref.listenManual<AsyncValue>(authControllerProvider, (prev, next) async {
+    ref.listenManual<AsyncValue<User?>>(authControllerProvider, (prev, next) async {
       final wasAnonymous = prev?.asData?.value == null;
       final isAuthed = next.asData?.value != null;
       if (wasAnonymous && isAuthed) {

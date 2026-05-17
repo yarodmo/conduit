@@ -5,8 +5,6 @@ import 'package:mocktail/mocktail.dart';
 import 'package:conduit_mobile/core/router/app_router.dart';
 import 'package:conduit_mobile/features/auth/data/auth_repository.dart';
 import 'package:conduit_mobile/features/auth/domain/user.dart';
-import 'package:conduit_mobile/features/auth/providers.dart';
-
 class _MockAuthRepo extends Mock implements AuthRepository {}
 
 void main() {
@@ -14,7 +12,7 @@ void main() {
 
   setUp(() => repo = _MockAuthRepo());
 
-  Future<Widget> _buildApp(ProviderContainer container) async {
+  Future<Widget> buildApp(ProviderContainer container) async {
     final router = container.read(appRouterProvider);
     return UncontrolledProviderScope(
       container: container,
@@ -29,7 +27,7 @@ void main() {
     ]);
     addTearDown(container.dispose);
 
-    await tester.pumpWidget(await _buildApp(container));
+    await tester.pumpWidget(await buildApp(container));
     await tester.pumpAndSettle();
 
     // Login screen marker
@@ -51,7 +49,7 @@ void main() {
     ]);
     addTearDown(container.dispose);
 
-    await tester.pumpWidget(await _buildApp(container));
+    await tester.pumpWidget(await buildApp(container));
     // Wait for auth restore + jobs FutureProvider to settle (will fail
     // to load jobs without a real API but the screen still renders).
     await tester.pump(const Duration(milliseconds: 100));

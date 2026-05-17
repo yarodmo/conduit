@@ -51,7 +51,7 @@ class PlanMetadata {
       };
 }
 
-/// Helper to convert HttpResponse<List<int>> → Uint8List.
+/// Helper to convert `HttpResponse<List<int>>` → Uint8List.
 extension TileBytes on HttpResponse<List<int>> {
   Uint8List get bytes => Uint8List.fromList(data);
 }

@@ -15,7 +15,7 @@ void main() {
     repo = RfisRepository(api);
   });
 
-  RfiListItem _rfi(String id, DateTime date) => RfiListItem(
+  RfiListItem rfi(String id, DateTime date) => RfiListItem(
         id: id,
         rfiNumber: 'RFI-$id',
         title: 'Test RFI $id',
@@ -27,9 +27,9 @@ void main() {
 
   test('listAcrossUserProjects aggregates and sorts by createdAt desc',
       () async {
-    final p1Older = _rfi('a', DateTime(2026, 5, 1));
-    final p1Newer = _rfi('b', DateTime(2026, 5, 10));
-    final p2Newest = _rfi('c', DateTime(2026, 5, 14));
+    final p1Older = rfi('a', DateTime(2026, 5, 1));
+    final p1Newer = rfi('b', DateTime(2026, 5, 10));
+    final p2Newest = rfi('c', DateTime(2026, 5, 14));
 
     when(() => api.listForProject('proj-1', any()))
         .thenAnswer((_) async => [p1Older, p1Newer]);
@@ -46,7 +46,7 @@ void main() {
 
   test('listAcrossUserProjects skips projects that throw', () async {
     when(() => api.listForProject('good', any()))
-        .thenAnswer((_) async => [_rfi('x', DateTime(2026, 5, 5))]);
+        .thenAnswer((_) async => [rfi('x', DateTime(2026, 5, 5))]);
     when(() => api.listForProject('bad', any()))
         .thenThrow(Exception('Server error'));
 

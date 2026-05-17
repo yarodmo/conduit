@@ -8,8 +8,6 @@ import 'package:conduit_mobile/features/jobs/data/jobs_repository.dart';
 import 'package:conduit_mobile/features/jobs/domain/project.dart';
 import 'package:conduit_mobile/features/jobs/domain/zone.dart';
 import 'package:conduit_mobile/features/jobs/presentation/my_jobs_screen.dart';
-import 'package:conduit_mobile/features/jobs/providers.dart';
-
 class _MockJobsRepo extends Mock implements JobsRepository {}
 
 class _MockAuthRepo extends Mock implements AuthRepository {}
@@ -63,7 +61,7 @@ void main() {
     when(() => authRepo.currentUser()).thenAnswer((_) async => sampleUser);
   });
 
-  Widget _wrap() => ProviderScope(
+  Widget wrap() => ProviderScope(
         overrides: [
           jobsRepositoryProvider.overrideWithValue(jobsRepo),
           authRepositoryProvider.overrideWithValue(authRepo),
@@ -79,7 +77,7 @@ void main() {
               blockedCount: 1,
             ));
 
-    await tester.pumpWidget(_wrap());
+    await tester.pumpWidget(wrap());
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
     await tester.pumpAndSettle();
 
@@ -98,7 +96,7 @@ void main() {
               blockedCount: 0,
             ));
 
-    await tester.pumpWidget(_wrap());
+    await tester.pumpWidget(wrap());
     await tester.pumpAndSettle();
 
     expect(find.textContaining('No zones assigned yet'), findsOneWidget);
@@ -108,7 +106,7 @@ void main() {
     when(() => jobsRepo.fetchJobs(forceRefresh: any(named: 'forceRefresh')))
         .thenThrow(Exception('Network unavailable'));
 
-    await tester.pumpWidget(_wrap());
+    await tester.pumpWidget(wrap());
     await tester.pumpAndSettle();
 
     expect(find.text('Could not load your jobs'), findsOneWidget);
@@ -123,7 +121,7 @@ void main() {
               blockedCount: 1,
             ));
 
-    await tester.pumpWidget(_wrap());
+    await tester.pumpWidget(wrap());
     await tester.pumpAndSettle();
 
     expect(

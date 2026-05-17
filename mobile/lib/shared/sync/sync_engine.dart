@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:conduit_mobile/core/network/connectivity_provider.dart';
 import 'package:conduit_mobile/features/jobs/providers.dart';
 import 'package:conduit_mobile/shared/sync/sync_dispatcher.dart';
-import 'package:conduit_mobile/shared/sync/sync_op.dart';
 import 'package:conduit_mobile/shared/sync/sync_queue_service.dart';
 
 /// Drains the pending sync queue when the device is online.
@@ -26,22 +25,23 @@ class SyncEngine {
   static const _backoffSeconds = [2, 4, 8, 16, 32];
 
   bool _draining = false;
-  StreamSubscription<ConnectivityState>? _connectivitySub;
+  ProviderSubscription<AsyncValue<ConnectivityState>>? _connectivitySub;
 
   /// Subscribe to connectivity transitions.
   void start() {
-    _connectivitySub?.cancel();
-    _connectivitySub = _ref.read(connectivityProvider.stream).listen((state) {
-      if (state == ConnectivityState.online) {
-        unawaited(drain());
-      }
-    });
+    _connectivitySub?.close();
+    _connectivitySub = _ref.listen<AsyncValue<ConnectivityState>>(
+      connectivityProvider,
+      (prev, next) => next.whenData((state) {
+        if (state == ConnectivityState.online) unawaited(drain());
+      }),
+    );
     // Attempt immediate drain on startup
     unawaited(drain());
   }
 
   Future<void> stop() async {
-    await _connectivitySub?.cancel();
+    _connectivitySub?.close();
   }
 
   /// Drain queue. Safe to call concurrently — re-entries are no-ops.

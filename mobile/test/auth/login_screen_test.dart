@@ -16,7 +16,7 @@ void main() {
     repo = _MockAuthRepo();
   });
 
-  Widget _wrap() {
+  Widget wrap() {
     return ProviderScope(
       overrides: [
         authRepositoryProvider.overrideWithValue(repo),
@@ -28,7 +28,7 @@ void main() {
   testWidgets('login screen renders all required fields', (tester) async {
     when(() => repo.currentUser()).thenAnswer((_) async => null);
 
-    await tester.pumpWidget(_wrap());
+    await tester.pumpWidget(wrap());
     await tester.pumpAndSettle();
 
     expect(find.text('Conduit'), findsOneWidget);
@@ -41,7 +41,7 @@ void main() {
   testWidgets('shows validation error for empty email', (tester) async {
     when(() => repo.currentUser()).thenAnswer((_) async => null);
 
-    await tester.pumpWidget(_wrap());
+    await tester.pumpWidget(wrap());
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('login_submit_button')));
@@ -53,7 +53,7 @@ void main() {
   testWidgets('shows validation error for invalid email format', (tester) async {
     when(() => repo.currentUser()).thenAnswer((_) async => null);
 
-    await tester.pumpWidget(_wrap());
+    await tester.pumpWidget(wrap());
     await tester.pumpAndSettle();
 
     await tester.enterText(
@@ -72,7 +72,7 @@ void main() {
       AuthException('Invalid credentials'),
     );
 
-    await tester.pumpWidget(_wrap());
+    await tester.pumpWidget(wrap());
     await tester.pumpAndSettle();
 
     await tester.enterText(
