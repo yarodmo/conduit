@@ -35,6 +35,7 @@ class WorkZoneResponse(BaseModel):
     geofence: dict[str, Any] | None
     order_index: int
     blocked_reason: str | None
+    cached_takeoff_items: list[dict] | None = None
     blocked_rfi_id: uuid.UUID | None
     created_at: datetime
     updated_at: datetime

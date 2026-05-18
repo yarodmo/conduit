@@ -28,6 +28,7 @@ from app.core.dependencies import get_current_org, get_current_user
 from app.models.auth import Organization, User
 from app.modules.takeoff.schemas import (
     CostPreviewResponse,
+    TakeoffCompareResponse,
     TakeoffInitResponse,
     TakeoffItemCreate,
     TakeoffItemResponse,
@@ -143,6 +144,26 @@ async def approve_takeoff(
     Use after human review is complete.
     """
     return await TakeoffService.approve(db, job_id, org.id)
+
+
+@router.get(
+    "/takeoff/{job_a_id}/compare/{job_b_id}",
+    response_model=TakeoffCompareResponse,
+)
+async def compare_takeoffs(
+    job_a_id: uuid.UUID,
+    job_b_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+    org: Organization = Depends(get_current_org),
+) -> TakeoffCompareResponse:
+    """
+    Compare two takeoff jobs — returns cost_delta and item delta.
+
+    Competitive claim vs Bluebeam: quantifies budget impact of plan revisions.
+    cost_delta_usd > 0 means job_b costs more (scope added).
+    """
+    return await TakeoffService.compare(db, job_a_id, job_b_id, org.id)
 
 
 @router.get("/takeoff/{job_id}/summary", response_model=TakeoffSummaryResponse)

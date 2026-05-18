@@ -58,6 +58,9 @@ class WorkZone(ConduitBase):
     geofence: Mapped[dict[str, Any] | None] = mapped_column(JSON(), nullable=True)
     order_index: Mapped[int] = mapped_column(Integer(), nullable=False, default=0)
     blocked_reason: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    cached_takeoff_items: Mapped[list[dict[str, Any]] | None] = mapped_column(
+        JSON(), nullable=True,
+    )
     blocked_rfi_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("rfis.id"), nullable=True,
     )

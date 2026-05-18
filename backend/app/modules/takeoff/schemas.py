@@ -110,3 +110,18 @@ class TakeoffSummaryResponse(BaseModel):
     low_confidence_items: int
     requires_review_items: int
     human_corrected_items: int
+
+
+class TakeoffCompareResponse(BaseModel):
+    """
+    Cost and item delta between two takeoff versions.
+
+    Competitive claim vs Bluebeam (PROMPT 13 test #5):
+      Bluebeam shows visual diff only.
+      Conduit quantifies cost_delta_usd so the PM knows the budget impact.
+    """
+    job_a_id: uuid.UUID
+    job_b_id: uuid.UUID
+    cost_delta_usd: Decimal
+    items_added: int
+    items_removed: int

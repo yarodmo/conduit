@@ -263,6 +263,35 @@ class TakeoffService:
 
         job.status = "approved"
         job.approved_at = datetime.now(tz=timezone.utc)
+        await db.flush()
+
+        # Populate offline cache on all zones in this project (PROMPT 9)
+        from sqlalchemy import select as _sel
+        from app.models.field import WorkZone
+        items_rows = (await db.execute(
+            _sel(TakeoffItem).where(TakeoffItem.takeoff_job_id == job_id)
+        )).scalars().all()
+        cache_payload = [
+            {
+                "type": it.type,
+                "tag": it.tag,
+                "quantity": str(it.quantity),
+                "unit": it.unit,
+                "specification": it.specification,
+                "system": it.system,
+            }
+            for it in items_rows
+        ]
+        zones = (await db.execute(
+            _sel(WorkZone).where(
+                WorkZone.project_id == job.project_id,
+                WorkZone.org_id == org_id,
+                WorkZone.deleted_at.is_(None),
+            )
+        )).scalars().all()
+        for zone in zones:
+            zone.cached_takeoff_items = cache_payload
+
         await db.commit()
         await db.refresh(job)
 
@@ -270,6 +299,60 @@ class TakeoffService:
             **{c.key: getattr(job, c.key) for c in TakeoffJob.__table__.columns
                if hasattr(job, c.key)},
             progress_pct=job.progress_pct,
+        )
+
+    @staticmethod
+    async def compare(
+        db: AsyncSession,
+        job_a_id: uuid.UUID,
+        job_b_id: uuid.UUID,
+        org_id: uuid.UUID,
+    ):
+        """
+        Compare two takeoff jobs and return cost_delta + item deltas.
+
+        cost_delta > 0 means job_b is more expensive (additions).
+        cost_delta < 0 means job_b is cheaper (removals/reductions).
+
+        Validates PROMPT 4 competitive claim vs Bluebeam:
+          Bluebeam shows diff visually. Conduit quantifies the cost impact.
+        """
+        from app.modules.takeoff.schemas import TakeoffCompareResponse
+
+        async def _fetch(jid: uuid.UUID) -> TakeoffJob:
+            stmt = (
+                select(TakeoffJob)
+                .options(selectinload(TakeoffJob.items))
+                .where(
+                    TakeoffJob.id == jid,
+                    TakeoffJob.org_id == org_id,
+                    TakeoffJob.deleted_at.is_(None),
+                )
+            )
+            job = (await db.execute(stmt)).scalar_one_or_none()
+            if not job:
+                raise HTTPException(status_code=404, detail=f"Takeoff job {jid} not found")
+            return job
+
+        job_a = await _fetch(job_a_id)
+        job_b = await _fetch(job_b_id)
+
+        cost_a = job_a.total_material_cost_usd or Decimal("0")
+        cost_b = job_b.total_material_cost_usd or Decimal("0")
+        cost_delta = cost_b - cost_a
+
+        # Item-level delta: compare by (type, tag) pairs
+        tags_a = {(it.type, it.tag) for it in job_a.items}
+        tags_b = {(it.type, it.tag) for it in job_b.items}
+        items_added = len(tags_b - tags_a)
+        items_removed = len(tags_a - tags_b)
+
+        return TakeoffCompareResponse(
+            job_a_id=job_a_id,
+            job_b_id=job_b_id,
+            cost_delta_usd=cost_delta,
+            items_added=items_added,
+            items_removed=items_removed,
         )
 
     @staticmethod
