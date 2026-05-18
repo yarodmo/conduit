@@ -6,6 +6,7 @@ import 'package:conduit_mobile/features/jobs/domain/zone.dart';
 import 'package:conduit_mobile/features/plan_viewer/data/plans_repository.dart';
 import 'package:conduit_mobile/features/plan_viewer/domain/plan.dart';
 import 'package:conduit_mobile/features/plan_viewer/providers.dart';
+import 'package:conduit_mobile/features/ai_assistant/presentation/ai_assistant_sheet.dart';
 import 'package:conduit_mobile/features/plan_viewer/presentation/widgets/ask_ai_fab.dart';
 import 'package:conduit_mobile/features/plan_viewer/presentation/widgets/zone_detail_sheet.dart';
 
@@ -62,11 +63,7 @@ class PlanViewerScreen extends ConsumerWidget {
   }
 
   void _openAskAiSheet(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => const _AskAiSheet(),
-    );
+    AiAssistantSheet.show(context);
   }
 }
 
@@ -236,46 +233,6 @@ class _PageSelector extends StatelessWidget {
           onPressed: current < total ? () => onChange(current + 1) : null,
         ),
       ],
-    );
-  }
-}
-
-/// Lightweight placeholder — full AI assistant integration in Turn 5.
-class _AskAiSheet extends StatelessWidget {
-  const _AskAiSheet();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Ask Conduit AI',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Voice + text Q&A wired in Turn 5.',
-                style: TextStyle(color: Theme.of(context).hintColor),
-              ),
-              const SizedBox(height: 24),
-              FilledButton.icon(
-                onPressed: () => Navigator.of(context).pop(),
-                icon: const Icon(Icons.close),
-                label: const Text('Close'),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

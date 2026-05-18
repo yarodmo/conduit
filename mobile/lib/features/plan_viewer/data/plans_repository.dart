@@ -6,6 +6,7 @@ import 'package:hive_ce_flutter/hive_flutter.dart';
 import 'package:conduit_mobile/core/network/dio_client.dart';
 import 'package:conduit_mobile/core/storage/hive_setup.dart';
 import 'package:conduit_mobile/features/plan_viewer/data/plans_api.dart';
+import 'package:conduit_mobile/features/plan_viewer/domain/plan.dart';
 
 /// Cache-first plan + tile loader.
 ///
@@ -58,6 +59,9 @@ class PlansRepository {
       rethrow;
     }
   }
+
+  Future<List<Plan>> listPlans(String projectId) =>
+      _api.listPlans(projectId);
 
   Future<PlanMetadata> fetchMetadata(String planId) async {
     return _api.getMetadata(planId);

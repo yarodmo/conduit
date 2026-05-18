@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:conduit_mobile/core/notifications/fcm_service.dart';
 import 'package:conduit_mobile/features/jobs/providers.dart';
+import 'package:conduit_mobile/shared/services/zone_preload_service.dart';
 
 /// Wires FCM streams to in-app banners + deep links via go_router.
 ///
@@ -29,6 +32,16 @@ class NotificationHandler {
     if (type == FcmEventType.zoneAssigned ||
         type == FcmEventType.zoneBlocked) {
       _ref.invalidate(jobsBundleProvider);
+    }
+
+    // Auto-download AI cache + plan tiles for newly assigned zones (PROMPT 9)
+    if (type == FcmEventType.zoneAssigned) {
+      final projectId = msg.data['project_id']?.toString();
+      if (projectId != null && projectId.isNotEmpty) {
+        unawaited(
+          _ref.read(zonePreloadServiceProvider).preloadForProject(projectId),
+        );
+      }
     }
 
     if (!context.mounted) return;

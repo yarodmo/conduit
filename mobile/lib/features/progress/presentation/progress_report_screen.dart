@@ -9,6 +9,7 @@ import 'package:conduit_mobile/features/progress/presentation/widgets/progress_s
 import 'package:conduit_mobile/features/progress/presentation/widgets/status_picker.dart';
 import 'package:conduit_mobile/features/progress/providers.dart';
 import 'package:conduit_mobile/shared/widgets/offline_banner.dart';
+import 'package:conduit_mobile/shared/widgets/voice_field.dart';
 
 class ProgressReportScreen extends ConsumerWidget {
   const ProgressReportScreen({
@@ -49,9 +50,13 @@ class ProgressReportScreen extends ConsumerWidget {
                   ),
                   if (form.status == ReportStatusPick.blocked) ...[
                     const SizedBox(height: 16),
-                    _BlockedReasonField(
+                    VoiceField(
+                      label: 'Why is this blocked? *',
+                      hint: 'e.g., Missing structural drawing for wall opening',
                       value: form.blockedReason,
                       onChanged: ctrl.setBlockedReason,
+                      prefixIcon: const Icon(Icons.report_problem_outlined),
+                      maxLength: 1000,
                     ),
                   ],
                   const SizedBox(height: 24),
@@ -66,9 +71,14 @@ class ProgressReportScreen extends ConsumerWidget {
                     onRemove: ctrl.removePhoto,
                   ),
                   const SizedBox(height: 24),
-                  _NotesField(
+                  VoiceField(
+                    label: 'Notes (optional)',
+                    hint: 'Anything else worth flagging?',
                     value: form.notes,
                     onChanged: ctrl.setNotes,
+                    prefixIcon: const Icon(Icons.notes_outlined),
+                    maxLines: 4,
+                    maxLength: 2000,
                   ),
                   if (form.error != null) ...[
                     const SizedBox(height: 16),
@@ -122,50 +132,6 @@ class ProgressReportScreen extends ConsumerWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _BlockedReasonField extends StatelessWidget {
-  const _BlockedReasonField({required this.value, required this.onChanged});
-  final String value;
-  final ValueChanged<String> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return TextField(
-      decoration: const InputDecoration(
-        labelText: 'Why is this blocked? *',
-        hintText: 'e.g., Missing structural drawing for wall opening',
-        prefixIcon: Icon(Icons.report_problem_outlined),
-      ),
-      maxLines: 3,
-      maxLength: 1000,
-      controller: TextEditingController(text: value)
-        ..selection = TextSelection.collapsed(offset: value.length),
-      onChanged: onChanged,
-    );
-  }
-}
-
-class _NotesField extends StatelessWidget {
-  const _NotesField({required this.value, required this.onChanged});
-  final String value;
-  final ValueChanged<String> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return TextField(
-      decoration: const InputDecoration(
-        labelText: 'Notes (optional)',
-        hintText: 'Anything else worth flagging?',
-        prefixIcon: Icon(Icons.notes_outlined),
-      ),
-      maxLines: 4,
-      maxLength: 2000,
-      controller: TextEditingController(text: value)
-        ..selection = TextSelection.collapsed(offset: value.length),
-      onChanged: onChanged,
     );
   }
 }
