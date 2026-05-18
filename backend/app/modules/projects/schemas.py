@@ -138,3 +138,35 @@ class ProjectDetailResponse(ProjectResponse):
 class ProjectListResponse(BaseModel):
     projects: list[ProjectResponse]
     total: int
+
+
+# ══════════════════════════════════════
+# ONBOARDING SCHEMAS (Sprint 6 / T2)
+# ══════════════════════════════════════
+
+class OnboardingStep(BaseModel):
+    key: str
+    label: str
+    completed: bool
+    required: bool = True
+
+
+class OnboardingStatusResponse(BaseModel):
+    """
+    Tells the frontend which wizard mode to render.
+
+    mode="simplified"  → 3-step wizard (residential_single, small_commercial,
+                         or complexity=simple) — designed for field techs and
+                         small residential contractors.
+    mode="standard"    → 5-step wizard (commercial, institutional, industrial).
+
+    The frontend uses `steps` to render the progress bar and `next_step_key`
+    to know which panel to open.
+    """
+    project_id: uuid.UUID
+    mode: str
+    steps_total: int
+    steps_completed: int
+    next_step_key: str | None
+    is_complete: bool
+    steps: list[OnboardingStep]

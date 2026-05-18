@@ -27,6 +27,7 @@ from app.core.database import get_db
 from app.core.dependencies import get_current_org, get_current_user, get_org_membership
 from app.models.auth import Organization, OrganizationMember, User
 from app.modules.projects.schemas import (
+    OnboardingStatusResponse,
     ProjectCreateRequest,
     ProjectDetailResponse,
     ProjectListResponse,
@@ -148,6 +149,36 @@ async def delete_project(
     """
     svc = _get_service(db)
     return await svc.delete_project(
+        project_id=project_id,
+        org_id=org.id,
+        org_role=membership.role,
+        current_user_id=user.id,
+    )
+
+
+# ══════════════════════════════════════
+# ONBOARDING ENDPOINT (Sprint 6 / T2)
+# ══════════════════════════════════════
+
+@router.get("/{project_id}/onboarding", response_model=OnboardingStatusResponse)
+async def get_onboarding_status(
+    project_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    org: Organization = Depends(get_current_org),
+    membership: OrganizationMember = Depends(get_org_membership),
+    db: AsyncSession = Depends(get_db),
+) -> OnboardingStatusResponse:
+    """
+    Returns the wizard mode and step completion state for a project.
+
+    mode="simplified" (3 steps): residential_single, small_commercial, or complexity=simple
+    mode="standard"  (5 steps): commercial, institutional, industrial
+
+    Steps are derived from live DB state — never stale.
+    Used by the frontend to decide which onboarding wizard to render.
+    """
+    svc = _get_service(db)
+    return await svc.get_onboarding_status(
         project_id=project_id,
         org_id=org.id,
         org_role=membership.role,

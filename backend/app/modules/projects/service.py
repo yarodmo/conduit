@@ -395,6 +395,137 @@ class ProjectService:
         )
         return {"message": "Member removed"}
 
+    # ══════════════════════════════════════
+    # ONBOARDING (Sprint 6 / T2)
+    # ══════════════════════════════════════
+
+    async def get_onboarding_status(
+        self,
+        *,
+        project_id: uuid.UUID,
+        org_id: uuid.UUID,
+        org_role: OrgRole,
+        current_user_id: uuid.UUID,
+    ):
+        """
+        Returns wizard mode + step completion state derived from existing data.
+
+        Simplified (3-step): residential_single, small_commercial, or complexity=simple
+        Standard  (5-step):  commercial, institutional, industrial, or complexity≥standard
+
+        Steps are never stored — always computed from DB state so they stay
+        in sync automatically when plans/members/zones are added.
+        """
+        from sqlalchemy import func, select
+
+        from app.models.field import WorkZone
+        from app.models.plans import Plan
+        from app.modules.projects.schemas import OnboardingStatusResponse, OnboardingStep
+
+        self._check_org_permission(org_role, Permission.PROJECT_READ)
+        project = await self._get_project_or_404(project_id, org_id)
+
+        # ── Determine mode ─────────────────────────────────────────────────
+        simple_types = {"residential_single", "small_commercial"}
+        is_simplified = (
+            project.type.value in simple_types
+            or project.complexity.value == "simple"
+        )
+
+        # ── Probe DB for step completion ───────────────────────────────────
+        plan_count = (await self.db.execute(
+            select(func.count()).select_from(Plan).where(
+                Plan.project_id == project_id,
+                Plan.deleted_at.is_(None),
+            )
+        )).scalar_one()
+
+        field_tech_count = (await self.db.execute(
+            select(func.count()).select_from(ProjectMember).where(
+                ProjectMember.project_id == project_id,
+                ProjectMember.role == ProjectMemberRole.FIELD_TECH,
+                ProjectMember.deleted_at.is_(None),
+            )
+        )).scalar_one()
+
+        team_count = (await self.db.execute(
+            select(func.count()).select_from(ProjectMember).where(
+                ProjectMember.project_id == project_id,
+                ProjectMember.role != ProjectMemberRole.OWNER,
+                ProjectMember.deleted_at.is_(None),
+            )
+        )).scalar_one()
+
+        zone_count = (await self.db.execute(
+            select(func.count()).select_from(WorkZone).where(
+                WorkZone.project_id == project_id,
+                WorkZone.deleted_at.is_(None),
+            )
+        )).scalar_one()
+
+        has_location = bool(project.city or project.address)
+
+        # ── Build step list ────────────────────────────────────────────────
+        if is_simplified:
+            steps = [
+                OnboardingStep(
+                    key="name",
+                    label="Name your project",
+                    completed=True,
+                ),
+                OnboardingStep(
+                    key="upload_plan",
+                    label="Upload a plan (photo or PDF)",
+                    completed=plan_count > 0,
+                ),
+                OnboardingStep(
+                    key="invite_tech",
+                    label="Invite a field technician",
+                    completed=field_tech_count > 0,
+                ),
+            ]
+        else:
+            steps = [
+                OnboardingStep(
+                    key="name",
+                    label="Name and describe your project",
+                    completed=True,
+                ),
+                OnboardingStep(
+                    key="configure",
+                    label="Set location and contractor",
+                    completed=has_location,
+                ),
+                OnboardingStep(
+                    key="upload_plan",
+                    label="Upload MEP plans",
+                    completed=plan_count > 0,
+                ),
+                OnboardingStep(
+                    key="invite_team",
+                    label="Build your team",
+                    completed=team_count > 0,
+                ),
+                OnboardingStep(
+                    key="setup_zones",
+                    label="Define zones on the plan",
+                    completed=zone_count > 0,
+                ),
+            ]
+
+        completed_steps = sum(1 for s in steps if s.completed)
+        next_step = next((s.key for s in steps if not s.completed), None)
+
+        return OnboardingStatusResponse(
+            project_id=project_id,
+            mode="simplified" if is_simplified else "standard",
+            steps_total=len(steps),
+            steps_completed=completed_steps,
+            next_step_key=next_step,
+            is_complete=next_step is None,
+            steps=steps,
+        )
+
     async def list_members(
         self,
         *,

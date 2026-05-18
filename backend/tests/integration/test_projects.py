@@ -377,3 +377,180 @@ class TestProjectTenantIsolation:
         headers_no_org = {"Authorization": auth_headers["Authorization"]}
         resp = await client.get(f"{PROJECTS_URL}/{project['id']}", headers=headers_no_org)
         assert resp.status_code == 400
+
+
+# ══════════════════════════════════════
+# Sprint 6 T2 — ONBOARDING
+# ══════════════════════════════════════
+class TestProjectOnboarding:
+    """
+    Validates the multi-scale onboarding endpoint.
+
+    SPEC (PROMPT 4 / Sprint 6):
+      - residential_single / small_commercial / complexity=simple → 3 steps ("simplified")
+      - commercial / institutional / industrial           → 5 steps ("standard")
+    """
+
+    @pytest.mark.asyncio
+    async def test_residential_single_returns_simplified_mode(
+        self, client: AsyncClient, auth_headers: dict, free_plan
+    ):
+        """residential_single must drive the 3-step simplified wizard."""
+        project = await create_project(
+            client, auth_headers,
+            type="residential_single",
+            complexity="simple",
+            name="Smith Residence",
+        )
+        resp = await client.get(
+            f"{PROJECTS_URL}/{project['id']}/onboarding",
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["mode"] == "simplified"
+        assert body["steps_total"] == 3
+        assert len(body["steps"]) == 3
+
+    @pytest.mark.asyncio
+    async def test_small_commercial_returns_simplified_mode(
+        self, client: AsyncClient, auth_headers: dict, free_plan
+    ):
+        """small_commercial also maps to the simplified 3-step wizard."""
+        project = await create_project(
+            client, auth_headers,
+            type="small_commercial",
+            complexity="simple",
+            name="Corner Shop MEP",
+        )
+        resp = await client.get(
+            f"{PROJECTS_URL}/{project['id']}/onboarding",
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["mode"] == "simplified"
+        assert body["steps_total"] == 3
+
+    @pytest.mark.asyncio
+    async def test_commercial_returns_standard_mode(
+        self, client: AsyncClient, auth_headers: dict, free_plan
+    ):
+        """commercial project type must drive the 5-step standard wizard."""
+        project = await create_project(client, auth_headers)  # type=commercial by default
+        resp = await client.get(
+            f"{PROJECTS_URL}/{project['id']}/onboarding",
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["mode"] == "standard"
+        assert body["steps_total"] == 5
+        assert len(body["steps"]) == 5
+
+    @pytest.mark.asyncio
+    async def test_new_project_first_step_completed(
+        self, client: AsyncClient, auth_headers: dict, free_plan
+    ):
+        """Step 1 (name) is always completed as soon as the project is created."""
+        project = await create_project(
+            client, auth_headers,
+            type="residential_single",
+            complexity="simple",
+        )
+        resp = await client.get(
+            f"{PROJECTS_URL}/{project['id']}/onboarding",
+            headers=auth_headers,
+        )
+        body = resp.json()
+        steps = {s["key"]: s for s in body["steps"]}
+        assert steps["name"]["completed"] is True
+
+    @pytest.mark.asyncio
+    async def test_new_project_not_complete(
+        self, client: AsyncClient, auth_headers: dict, free_plan
+    ):
+        """A freshly created project is never fully complete (steps 2+ pending)."""
+        project = await create_project(
+            client, auth_headers,
+            type="residential_single",
+            complexity="simple",
+        )
+        resp = await client.get(
+            f"{PROJECTS_URL}/{project['id']}/onboarding",
+            headers=auth_headers,
+        )
+        body = resp.json()
+        assert body["is_complete"] is False
+        assert body["next_step_key"] == "upload_plan"
+
+    @pytest.mark.asyncio
+    async def test_standard_project_next_step_configure_when_no_location(
+        self, client: AsyncClient, auth_headers: dict, free_plan
+    ):
+        """Commercial project without location: next step = 'configure'."""
+        project = await create_project(
+            client, auth_headers,
+            type="commercial",
+            complexity="complex",
+            address=None,
+            city=None,
+        )
+        resp = await client.get(
+            f"{PROJECTS_URL}/{project['id']}/onboarding",
+            headers=auth_headers,
+        )
+        body = resp.json()
+        assert body["next_step_key"] == "configure"
+
+    @pytest.mark.asyncio
+    async def test_standard_project_configure_complete_when_city_set(
+        self, client: AsyncClient, auth_headers: dict, free_plan
+    ):
+        """Commercial project WITH city: configure step is complete."""
+        project = await create_project(
+            client, auth_headers,
+            type="commercial",
+            complexity="complex",
+            city="Miami",
+        )
+        resp = await client.get(
+            f"{PROJECTS_URL}/{project['id']}/onboarding",
+            headers=auth_headers,
+        )
+        body = resp.json()
+        steps = {s["key"]: s for s in body["steps"]}
+        assert steps["configure"]["completed"] is True
+
+    @pytest.mark.asyncio
+    async def test_onboarding_returns_project_id(
+        self, client: AsyncClient, auth_headers: dict, free_plan
+    ):
+        """Response must echo the project_id for client-side correlation."""
+        project = await create_project(client, auth_headers)
+        resp = await client.get(
+            f"{PROJECTS_URL}/{project['id']}/onboarding",
+            headers=auth_headers,
+        )
+        body = resp.json()
+        assert body["project_id"] == project["id"]
+
+    @pytest.mark.asyncio
+    async def test_onboarding_404_for_unknown_project(
+        self, client: AsyncClient, auth_headers: dict, free_plan
+    ):
+        """Non-existent project must return 404."""
+        resp = await client.get(
+            f"{PROJECTS_URL}/{uuid.uuid4()}/onboarding",
+            headers=auth_headers,
+        )
+        assert resp.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_onboarding_requires_auth(
+        self, client: AsyncClient, auth_headers: dict, free_plan
+    ):
+        """Unauthenticated request must be rejected."""
+        project = await create_project(client, auth_headers)
+        resp = await client.get(f"{PROJECTS_URL}/{project['id']}/onboarding")
+        assert resp.status_code in {401, 403}
