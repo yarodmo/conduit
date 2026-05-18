@@ -79,6 +79,77 @@ def _update_plan(session: Any, plan_id: str, **kwargs: Any) -> None:
 
 # ── STEP 1 — Photo Normalization (OpenCV) ─────────────────────────────────
 
+def deskew_and_score(raw_bytes: bytes) -> tuple[bytes, bool, int]:
+    """Pure function: perspective-correct a phone photo and compute quality score.
+
+    Returns (processed_jpeg_bytes, deskew_applied, quality_score 0-100).
+    Separated from the Celery task so competitive tests can call it directly.
+    """
+    import cv2
+    import numpy as np
+
+    img_arr = np.frombuffer(raw_bytes, dtype=np.uint8)
+    img = cv2.imdecode(img_arr, cv2.IMREAD_COLOR)
+    if img is None:
+        raise ValueError("Could not decode image bytes")
+
+    deskew_applied = False
+
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+    edged = cv2.Canny(blurred, 75, 200)
+
+    contours, _ = cv2.findContours(edged.copy(), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    contours = sorted(contours, key=cv2.contourArea, reverse=True)[:5]
+
+    plan_contour = None
+    for c in contours:
+        peri = cv2.arcLength(c, True)
+        approx = cv2.approxPolyDP(c, 0.02 * peri, True)
+        if len(approx) == 4:
+            plan_contour = approx
+            break
+
+    if plan_contour is not None:
+        pts = plan_contour.reshape(4, 2).astype(np.float32)
+        s = pts.sum(axis=1)
+        diff = np.diff(pts, axis=1)
+        ordered = np.zeros((4, 2), dtype=np.float32)
+        ordered[0] = pts[np.argmin(s)]
+        ordered[2] = pts[np.argmax(s)]
+        ordered[1] = pts[np.argmin(diff)]
+        ordered[3] = pts[np.argmax(diff)]
+
+        w = int(max(
+            np.linalg.norm(ordered[0] - ordered[1]),
+            np.linalg.norm(ordered[2] - ordered[3]),
+        ))
+        h = int(max(
+            np.linalg.norm(ordered[0] - ordered[3]),
+            np.linalg.norm(ordered[1] - ordered[2]),
+        ))
+
+        if w > 100 and h > 100:
+            dst = np.array([[0, 0], [w, 0], [w, h], [0, h]], dtype=np.float32)
+            M = cv2.getPerspectiveTransform(ordered, dst)
+            img = cv2.warpPerspective(img, M, (w, h))
+            deskew_applied = True
+
+    # CLAHE contrast enhancement
+    lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
+    l_ch, a_ch, b_ch = cv2.split(lab)
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    l_ch = clahe.apply(l_ch)
+    img = cv2.cvtColor(cv2.merge([l_ch, a_ch, b_ch]), cv2.COLOR_LAB2BGR)
+
+    gray2 = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    fm = cv2.Laplacian(gray2, cv2.CV_64F).var()
+    quality_score = min(100, int(fm / 10))
+
+    _, buf = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 95])
+    return bytes(buf), deskew_applied, quality_score
+
+
 @celery_app.task(
     name="app.tasks.plan_tasks.normalize_photo",
     bind=True,
@@ -116,83 +187,17 @@ def normalize_photo(
     try:
         _update_job(session, job_id, current_step="normalizing_photo", progress_pct=5)
 
-        import cv2
-        import numpy as np
-        from PIL import Image
-
-        # Detect file extension from S3 original
         ext = "jpg"
         key = plan_original_key(org_id, project_id, plan_id, ext)
         raw = download_bytes(settings.S3_BUCKET_PLANS, key)
-        img_arr = np.frombuffer(raw, dtype=np.uint8)
-        img = cv2.imdecode(img_arr, cv2.IMREAD_COLOR)
 
-        if img is None:
-            logger.warning("normalize_photo: could not decode image for plan %s", plan_id)
-            return result
+        processed, deskew_applied, quality_score = deskew_and_score(raw)
+        result["deskew_applied"] = deskew_applied
 
-        # Perspective correction — find the largest quadrilateral (plan paper)
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-        edged = cv2.Canny(blurred, 75, 200)
-
-        contours, _ = cv2.findContours(edged.copy(), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-        contours = sorted(contours, key=cv2.contourArea, reverse=True)[:5]
-
-        plan_contour = None
-        for c in contours:
-            peri = cv2.arcLength(c, True)
-            approx = cv2.approxPolyDP(c, 0.02 * peri, True)
-            if len(approx) == 4:
-                plan_contour = approx
-                break
-
-        if plan_contour is not None:
-            pts = plan_contour.reshape(4, 2).astype(np.float32)
-            # Order: top-left, top-right, bottom-right, bottom-left
-            s = pts.sum(axis=1)
-            diff = np.diff(pts, axis=1)
-            ordered = np.zeros((4, 2), dtype=np.float32)
-            ordered[0] = pts[np.argmin(s)]
-            ordered[2] = pts[np.argmax(s)]
-            ordered[1] = pts[np.argmin(diff)]
-            ordered[3] = pts[np.argmax(diff)]
-
-            w = int(max(
-                np.linalg.norm(ordered[0] - ordered[1]),
-                np.linalg.norm(ordered[2] - ordered[3]),
-            ))
-            h = int(max(
-                np.linalg.norm(ordered[0] - ordered[3]),
-                np.linalg.norm(ordered[1] - ordered[2]),
-            ))
-
-            if w > 100 and h > 100:
-                dst = np.array([[0, 0], [w, 0], [w, h], [0, h]], dtype=np.float32)
-                M = cv2.getPerspectiveTransform(ordered, dst)
-                img = cv2.warpPerspective(img, M, (w, h))
-                result["deskew_applied"] = True
-
-        # Enhance contrast for OCR
-        lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
-        l_ch, a_ch, b_ch = cv2.split(lab)
-        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-        l_ch = clahe.apply(l_ch)
-        img = cv2.cvtColor(cv2.merge([l_ch, a_ch, b_ch]), cv2.COLOR_LAB2BGR)
-
-        # Quality score — based on Laplacian variance (sharpness)
-        gray2 = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        fm = cv2.Laplacian(gray2, cv2.CV_64F).var()
-        quality_score = min(100, int(fm / 10))
-
-        # Re-upload normalized image
-        _, buf = cv2.imencode(".jpg", img, [int(cv2.IMWRITE_JPEG_QUALITY), 95])
-        upload_bytes(buf.tobytes(), settings.S3_BUCKET_PLANS, key, "image/jpeg")
-
-        _update_plan(session, plan_id, deskew_applied=result["deskew_applied"],
+        upload_bytes(processed, settings.S3_BUCKET_PLANS, key, "image/jpeg")
+        _update_plan(session, plan_id, deskew_applied=deskew_applied,
                      quality_score=quality_score)
         _update_job(session, job_id, progress_pct=15)
-
         result["quality_score"] = quality_score
     except Exception as exc:
         logger.exception("normalize_photo failed: %s", exc)
